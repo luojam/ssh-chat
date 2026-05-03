@@ -10,7 +10,7 @@ import (
 )
 
 func TestInitialLayoutUsesFullFrame(t *testing.T) {
-	m := New(Config{Width: 40, Height: 8}).(model)
+	m := newModel(t, Config{Width: 40, Height: 8})
 
 	view := m.View()
 	lines := strings.Split(view.Content, "\n")
@@ -25,13 +25,13 @@ func TestInitialLayoutUsesFullFrame(t *testing.T) {
 	if !strings.Contains(lines[0], appName) || !strings.Contains(lines[0], statusConnected) {
 		t.Fatalf("header should include app name and status, got %q", lines[0])
 	}
-	if !strings.Contains(lines[0], "esc/ctrl+c to quit") {
+	if !strings.Contains(lines[0], quitHint) {
 		t.Fatalf("header should include quit hint, got %q", lines[0])
 	}
-	if strings.Contains(lines[1], "No messages yet.") {
+	if strings.Contains(lines[1], emptyStateText) {
 		t.Fatalf("empty state should not start at top of message area, got %q", lines[1])
 	}
-	if !strings.Contains(lines[len(lines)-2], "No messages yet.") {
+	if !strings.Contains(lines[len(lines)-2], emptyStateText) {
 		t.Fatalf("line above composer should include empty state, got %q", lines[len(lines)-2])
 	}
 	if !strings.Contains(lines[len(lines)-1], composerPrompt) {
@@ -40,7 +40,7 @@ func TestInitialLayoutUsesFullFrame(t *testing.T) {
 }
 
 func TestEnterAppendsLocalMessageAndClearsInput(t *testing.T) {
-	m := New(Config{Width: 40, Height: 8}).(model)
+	m := newModel(t, Config{Width: 40, Height: 8})
 
 	m = updateModel(t, m, keyText("h"))
 	m = updateModel(t, m, keyText("i"))
@@ -60,24 +60,24 @@ func TestEnterAppendsLocalMessageAndClearsInput(t *testing.T) {
 	if !view.AltScreen {
 		t.Fatal("view should request alt-screen")
 	}
-	if !strings.Contains(view.Content, "you") || !strings.Contains(view.Content, "hi") {
+	if !strings.Contains(view.Content, localAuthor) || !strings.Contains(view.Content, "hi") {
 		t.Fatalf("view content should render local message, got %q", view.Content)
 	}
 }
 
 func TestShortHistoryRendersAboveComposer(t *testing.T) {
-	m := New(Config{Width: 40, Height: 8}).(model)
+	m := newModel(t, Config{Width: 40, Height: 8})
 
 	m = updateModel(t, m, keyText("h"))
 	m = updateModel(t, m, keyText("i"))
 	m = updateModel(t, m, keySpecial(tea.KeyEnter))
 
 	lines := strings.Split(m.View().Content, "\n")
-	if strings.Contains(lines[1], "you") || strings.Contains(lines[1], "hi") {
+	if strings.Contains(lines[1], localAuthor) || strings.Contains(lines[1], "hi") {
 		t.Fatalf("message should not start at top of message area, got %q", lines[1])
 	}
 	lineAboveComposer := lines[len(lines)-2]
-	if !strings.Contains(lineAboveComposer, "you") || !strings.Contains(lineAboveComposer, "hi") {
+	if !strings.Contains(lineAboveComposer, localAuthor) || !strings.Contains(lineAboveComposer, "hi") {
 		t.Fatalf("line above composer should include latest message, got %q", lineAboveComposer)
 	}
 }
@@ -100,7 +100,7 @@ func TestHeaderStylesKeepQuitHintDim(t *testing.T) {
 }
 
 func TestHeaderKeepsEdgePadding(t *testing.T) {
-	m := New(Config{Width: 40, Height: 8}).(model)
+	m := newModel(t, Config{Width: 40, Height: 8})
 
 	header := m.renderHeader(40)
 
@@ -123,7 +123,7 @@ func TestHeaderKeepsEdgePadding(t *testing.T) {
 }
 
 func TestQIsNormalInput(t *testing.T) {
-	m := New(Config{Width: 40, Height: 8}).(model)
+	m := newModel(t, Config{Width: 40, Height: 8})
 
 	m = updateModel(t, m, keyText("q"))
 
@@ -140,7 +140,7 @@ func TestCtrlCAndEscQuit(t *testing.T) {
 		keyCtrl("c"),
 		keySpecial(tea.KeyEsc),
 	} {
-		m := New(Config{Width: 40, Height: 8}).(model)
+		m := newModel(t, Config{Width: 40, Height: 8})
 		_, cmd := m.Update(msg)
 		if cmd == nil {
 			t.Fatal("expected quit command, got nil")
@@ -150,6 +150,17 @@ func TestCtrlCAndEscQuit(t *testing.T) {
 			t.Fatalf("expected tea.QuitMsg, got %T", msg)
 		}
 	}
+}
+
+func newModel(t *testing.T, config Config) model {
+	t.Helper()
+
+	tm := New(config)
+	m, ok := tm.(model)
+	if !ok {
+		t.Fatalf("new model has type %T, want model", tm)
+	}
+	return m
 }
 
 func updateModel(t *testing.T, m model, msg tea.Msg) model {

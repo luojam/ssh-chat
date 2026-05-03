@@ -80,7 +80,6 @@ func teaHandler(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
 	}
 
 	return tui.New(tui.Config{
-		Term:   pty.Term,
 		Width:  pty.Window.Width,
 		Height: pty.Window.Height,
 	}), []tea.ProgramOption{}
