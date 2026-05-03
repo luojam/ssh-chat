@@ -38,6 +38,10 @@ func main() {
 			return password == validPassword
 		}),
 
+		// Wish builds the handler chain from first to last, so the last middleware
+		// listed here runs first for each SSH session. That gives logging the outer
+		// view of the whole flow, lets activeterm reject clients without a usable
+		// terminal, and only then starts one Bubble Tea program for the session.
 		wish.WithMiddleware(
 			bubbletea.Middleware(teaHandler),
 			activeterm.Middleware(),
@@ -68,7 +72,12 @@ func main() {
 }
 
 func teaHandler(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
-	pty, _, _ := sess.Pty()
+	pty, _, ok := sess.Pty()
+	if !ok {
+		// Wish's active-terminal middleware should reject this earlier, but keeping
+		// the handler defensive makes it safe even if middleware order changes.
+		return nil, nil
+	}
 
 	return tui.New(tui.Config{
 		Term:   pty.Term,

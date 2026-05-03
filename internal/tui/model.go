@@ -14,6 +14,9 @@ import (
 const (
 	appName             = "ssh-chat"
 	statusConnected     = "connected"
+	quitHint            = "esc/ctrl+c to quit"
+	headerLeftPadding   = 1
+	headerRightPadding  = 1
 	authorColumnWidth   = 8
 	composerPrompt      = "> "
 	composerPlaceholder = "Message..."
@@ -72,6 +75,7 @@ type styles struct {
 	header       lipgloss.Style
 	headerTitle  lipgloss.Style
 	headerStatus lipgloss.Style
+	headerHint   lipgloss.Style
 	empty        lipgloss.Style
 	author       lipgloss.Style
 	mineAuthor   lipgloss.Style
@@ -80,11 +84,13 @@ type styles struct {
 }
 
 func newStyles(isDark bool) styles {
+	headerBackground := lipgloss.Color("62")
 	if isDark {
 		return styles{
-			header:       lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Background(lipgloss.Color("62")),
-			headerTitle:  lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Background(lipgloss.Color("62")).Bold(true),
-			headerStatus: lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Background(lipgloss.Color("62")),
+			header:       lipgloss.NewStyle().Background(headerBackground),
+			headerTitle:  lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Background(headerBackground).Bold(true),
+			headerStatus: lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Background(headerBackground),
+			headerHint:   lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(headerBackground).Faint(true),
 			empty:        lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
 			author:       lipgloss.NewStyle().Foreground(lipgloss.Color("12")),
 			mineAuthor:   lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
@@ -94,9 +100,10 @@ func newStyles(isDark bool) styles {
 	}
 
 	return styles{
-		header:       lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Background(lipgloss.Color("62")),
-		headerTitle:  lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Background(lipgloss.Color("62")).Bold(true),
-		headerStatus: lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Background(lipgloss.Color("62")),
+		header:       lipgloss.NewStyle().Background(headerBackground),
+		headerTitle:  lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Background(headerBackground).Bold(true),
+		headerStatus: lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Background(headerBackground),
+		headerHint:   lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(headerBackground).Faint(true),
 		empty:        lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
 		author:       lipgloss.NewStyle().Foreground(lipgloss.Color("12")),
 		mineAuthor:   lipgloss.NewStyle().Foreground(lipgloss.Color("2")),
@@ -189,7 +196,7 @@ func (m *model) sendLocalMessage() {
 }
 
 func (m *model) refreshViewport() {
-	m.viewport.SetContentLines(m.messageLines(safeDimension(m.width)))
+	m.viewport.SetContentLines(m.bottomAlignedMessageLines(safeDimension(m.width), messageAreaHeight(m.height)))
 	m.viewport.GotoBottom()
 }
 
@@ -218,25 +225,75 @@ func (m model) render() string {
 
 func (m model) renderHeader(width int) string {
 	title := appName
-	if width <= lipgloss.Width(title) {
-		return m.styles.header.Width(width).MaxWidth(width).Inline(true).Render(ansi.Truncate(title, width, ""))
+	titleWidth := lipgloss.Width(title)
+	leftPadding := min(headerLeftPadding, max(0, width))
+	if width <= leftPadding+titleWidth {
+		content := renderHeaderEdgePadding(leftPadding) +
+			m.styles.headerTitle.Render(ansi.Truncate(title, width-leftPadding, ""))
+		return m.renderHeaderLine(content, width)
 	}
 
-	statusWidth := max(0, width-lipgloss.Width(title)-1)
-	status := ansi.Truncate(statusConnected, statusWidth, "")
-	gap := max(1, width-lipgloss.Width(title)-lipgloss.Width(status))
-	content := m.styles.headerTitle.Render(title) +
-		strings.Repeat(" ", gap) +
-		m.styles.headerStatus.Render(status)
+	statusText := statusConnected
+	statusWidth := lipgloss.Width(statusText)
+	rightPadding := min(headerRightPadding, max(0, width-leftPadding-titleWidth))
+	contentWidth := width - leftPadding - rightPadding
+	availableBetween := contentWidth - titleWidth - statusWidth - 2
+	if availableBetween < 1 {
+		statusWidth = max(0, contentWidth-titleWidth-1)
+		status := ansi.Truncate(statusText, statusWidth, "")
+		gap := max(0, contentWidth-titleWidth-lipgloss.Width(status))
+		content := renderHeaderEdgePadding(leftPadding) +
+			m.styles.headerTitle.Render(title) +
+			m.renderHeaderGap(gap) +
+			m.styles.headerStatus.Render(status) +
+			renderHeaderEdgePadding(rightPadding)
+		return m.renderHeaderLine(content, width)
+	}
 
-	return m.styles.header.Width(width).MaxWidth(width).Inline(true).Render(ansi.Truncate(content, width, ""))
+	hintText := ansi.Truncate(quitHint, availableBetween, "")
+	hintWidth := lipgloss.Width(hintText)
+	hintStart := leftPadding + titleWidth + 1 + (availableBetween-hintWidth)/2
+	statusStart := width - rightPadding - statusWidth
+	gap1 := hintStart - (leftPadding + titleWidth)
+	gap2 := statusStart - (hintStart + hintWidth)
+	content := renderHeaderEdgePadding(leftPadding) +
+		m.styles.headerTitle.Render(title) +
+		m.renderHeaderGap(gap1) +
+		m.styles.headerHint.Render(hintText) +
+		m.renderHeaderGap(gap2) +
+		m.styles.headerStatus.Render(statusText) +
+		renderHeaderEdgePadding(rightPadding)
+
+	return m.renderHeaderLine(content, width)
+}
+
+func (m model) renderHeaderGap(width int) string {
+	if width <= 0 {
+		return ""
+	}
+	return m.styles.header.Inline(true).Render(strings.Repeat(" ", width))
+}
+
+func renderHeaderEdgePadding(width int) string {
+	if width <= 0 {
+		return ""
+	}
+	return strings.Repeat(" ", width)
+}
+
+func (m model) renderHeaderLine(content string, width int) string {
+	line := ansi.Truncate(content, width, "")
+	if padding := width - lipgloss.Width(line); padding > 0 {
+		line += m.renderHeaderGap(padding)
+	}
+	return line
 }
 
 func (m model) renderMessages(width, height int) string {
 	vp := m.viewport
 	vp.SetWidth(width)
 	vp.SetHeight(height)
-	vp.SetContentLines(m.messageLines(width))
+	vp.SetContentLines(m.bottomAlignedMessageLines(width, height))
 	vp.GotoBottom()
 	return vp.View()
 }
@@ -258,6 +315,15 @@ func (m model) messageLines(width int) []string {
 		lines = append(lines, m.renderMessage(msg, width)...)
 	}
 	return lines
+}
+
+func (m model) bottomAlignedMessageLines(width, height int) []string {
+	lines := m.messageLines(width)
+	if height <= 0 || len(lines) >= height {
+		return lines
+	}
+	padding := make([]string, height-len(lines), height)
+	return append(padding, lines...)
 }
 
 func (m model) renderMessage(msg message, width int) []string {
