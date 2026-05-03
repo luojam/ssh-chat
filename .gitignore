@@ -4,6 +4,7 @@
 *.exe
 *.test
 *.out
+ssh-chat
 
 # Coverage and profiling
 coverage.*
@@ -12,6 +13,9 @@ coverage.*
 # Go workspace files
 go.work
 go.work.sum
+
+# Local SSH host keys
+.ssh/
 
 # Editor and OS files
 .DS_Store

@@ -9,8 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"charm.land/log/v2"
 	"charm.land/wish/v2"
+	"charm.land/wish/v2/activeterm"
+	"charm.land/wish/v2/bubbletea"
 	"charm.land/wish/v2/logging"
 	"github.com/charmbracelet/ssh"
 )
@@ -19,7 +23,7 @@ const (
 	host          = "localhost"
 	port          = "2222"
 	hostKeyPath   = ".ssh/id_ed25519"
-	validPassword = "asd123"
+	validPassword = "password"
 )
 
 func main() {
@@ -35,13 +39,8 @@ func main() {
 		}),
 
 		wish.WithMiddleware(
-			func(next ssh.Handler) ssh.Handler {
-				return func(sess ssh.Session) {
-					wish.Println(sess, "Welcome to ssh-chat.")
-					wish.Println(sess, "TUI coming soon.")
-					next(sess)
-				}
-			},
+			bubbletea.Middleware(teaHandler),
+			activeterm.Middleware(),
 			logging.Middleware(),
 		),
 	)
@@ -62,8 +61,67 @@ func main() {
 	<-done
 	log.Info("Stopping SSH server")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer func() { cancel() }()
+	defer cancel()
 	if err := s.Shutdown(ctx); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
 		log.Error("Could not stop server", "error", err)
 	}
+}
+
+func teaHandler(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
+	pty, _, _ := sess.Pty()
+
+	m := model{
+		term:      pty.Term,
+		width:     pty.Window.Width,
+		height:    pty.Window.Height,
+		bg:        "dark",
+		txtStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
+		quitStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
+	}
+
+	return m, []tea.ProgramOption{}
+}
+
+type model struct {
+	term      string
+	profile   string
+	width     int
+	height    int
+	bg        string
+	txtStyle  lipgloss.Style
+	quitStyle lipgloss.Style
+}
+
+func (m model) Init() tea.Cmd {
+	return tea.Batch(tea.RequestBackgroundColor)
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.ColorProfileMsg:
+		m.profile = msg.String()
+	case tea.BackgroundColorMsg:
+		if msg.IsDark() {
+			m.bg = "dark"
+		}
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		}
+	}
+
+	return m, nil
+}
+
+func (m model) View() tea.View {
+	s := "Welcome to ssh-chat!"
+
+	v := tea.NewView(m.txtStyle.Render(s) + "\n\n" + m.quitStyle.Render("Press 'q' to quit\n"))
+	v.AltScreen = true
+
+	return v
 }
