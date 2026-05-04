@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/luojam/ssh-chat/internal/chat"
@@ -15,7 +16,7 @@ func TestSendRequestedPostsToRoomAndRoomEventUpdatesTUI(t *testing.T) {
 		Width:  40,
 		Height: 8,
 		Room:   chat.NewRoom(),
-		Member: chat.Member{Name: "jami"},
+		Member: chat.Member{Name: "user"},
 	})
 
 	next, cmd := m.Update(tui.SendRequested{Body: "hello"})
@@ -27,7 +28,7 @@ func TestSendRequestedPostsToRoomAndRoomEventUpdatesTUI(t *testing.T) {
 	}
 
 	m = assertModel(t, next)
-	event := <-m.subscription.Events()
+	event := nextRoomEvent(t, m.subscription, chat.MessagePosted)
 	next, _ = m.Update(roomEvent{event: event})
 	m = assertModel(t, next)
 
@@ -42,11 +43,12 @@ func TestRoomEventMarksOtherMemberMessageAsNotMine(t *testing.T) {
 		Width:  40,
 		Height: 8,
 		Room:   chat.NewRoom(),
-		Member: chat.Member{Name: "jami"},
+		Member: chat.Member{Name: "user"},
 	})
 
 	next, _ := m.Update(roomEvent{
 		event: chat.Event{
+			Kind: chat.MessagePosted,
 			Message: chat.Message{
 				Author: chat.Member{Name: "sara"},
 				Body:   "hello",
@@ -66,11 +68,11 @@ func TestRoomEventMarksOtherMemberMessageAsNotMine(t *testing.T) {
 
 func TestRoomBroadcastReachesMultipleSessions(t *testing.T) {
 	room := chat.NewRoom()
-	jami := newModel(t, Config{
+	user := newModel(t, Config{
 		Width:  40,
 		Height: 8,
 		Room:   room,
-		Member: chat.Member{Name: "jami"},
+		Member: chat.Member{Name: "user"},
 	})
 	sara := newModel(t, Config{
 		Width:  40,
@@ -79,7 +81,7 @@ func TestRoomBroadcastReachesMultipleSessions(t *testing.T) {
 		Member: chat.Member{Name: "sara"},
 	})
 
-	_, cmd := jami.Update(tui.SendRequested{Body: "hello"})
+	_, cmd := user.Update(tui.SendRequested{Body: "hello"})
 	if cmd == nil {
 		t.Fatal("SendRequested should return a command")
 	}
@@ -87,21 +89,21 @@ func TestRoomBroadcastReachesMultipleSessions(t *testing.T) {
 		t.Fatalf("post command returned %T, want nil", msg)
 	}
 
-	jamiEvent := <-jami.subscription.Events()
-	saraEvent := <-sara.subscription.Events()
+	userEvent := nextRoomEvent(t, user.subscription, chat.MessagePosted)
+	saraEvent := nextRoomEvent(t, sara.subscription, chat.MessagePosted)
 
-	next, _ := jami.Update(roomEvent{event: jamiEvent})
-	jami = assertModel(t, next)
+	next, _ := user.Update(roomEvent{event: userEvent})
+	user = assertModel(t, next)
 	next, _ = sara.Update(roomEvent{event: saraEvent})
 	sara = assertModel(t, next)
 
-	jamiView := jami.View()
-	if !strings.Contains(jamiView.Content, "you") || !strings.Contains(jamiView.Content, "hello") {
-		t.Fatalf("sender view should render local message, got %q", jamiView.Content)
+	userView := user.View()
+	if !strings.Contains(userView.Content, "you") || !strings.Contains(userView.Content, "hello") {
+		t.Fatalf("sender view should render local message, got %q", userView.Content)
 	}
 
 	saraView := sara.View()
-	if !strings.Contains(saraView.Content, "jami") || !strings.Contains(saraView.Content, "hello") {
+	if !strings.Contains(saraView.Content, "user") || !strings.Contains(saraView.Content, "hello") {
 		t.Fatalf("receiver view should render sender name, got %q", saraView.Content)
 	}
 	if strings.Contains(saraView.Content, "you") {
@@ -111,7 +113,7 @@ func TestRoomBroadcastReachesMultipleSessions(t *testing.T) {
 
 func TestNewSessionCanRenderRoomHistory(t *testing.T) {
 	room := chat.NewRoom()
-	if _, err := room.Post(chat.Member{Name: "jami"}, "before join"); err != nil {
+	if _, err := room.Post(chat.Member{Name: "user"}, "before join"); err != nil {
 		t.Fatalf("Post returned error: %v", err)
 	}
 
@@ -127,8 +129,39 @@ func TestNewSessionCanRenderRoomHistory(t *testing.T) {
 	sara = assertModel(t, next)
 
 	view := sara.View()
-	if !strings.Contains(view.Content, "jami") || !strings.Contains(view.Content, "before join") {
+	if !strings.Contains(view.Content, "user") || !strings.Contains(view.Content, "before join") {
 		t.Fatalf("new session should render room history, got %q", view.Content)
+	}
+}
+
+func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{Name: "user"},
+	})
+
+	event := nextRoomEvent(t, m.subscription, chat.MemberJoined)
+	next, _ := m.Update(roomEvent{event: event})
+	m = assertModel(t, next)
+
+	view := m.View()
+	if !strings.Contains(view.Content, systemAuthor) || !strings.Contains(view.Content, "user joined") {
+		t.Fatalf("join should render as system message, got %q", view.Content)
+	}
+
+	next, _ = m.Update(roomEvent{
+		event: chat.Event{
+			Kind:   chat.MemberLeft,
+			Member: chat.Member{Name: "sara"},
+		},
+	})
+	m = assertModel(t, next)
+
+	view = m.View()
+	if !strings.Contains(view.Content, systemAuthor) || !strings.Contains(view.Content, "sara left") {
+		t.Fatalf("leave should render as system message, got %q", view.Content)
 	}
 }
 
@@ -137,7 +170,7 @@ func TestQuitRequestedClosesSubscriptionBeforeQuit(t *testing.T) {
 		Width:  40,
 		Height: 8,
 		Room:   chat.NewRoom(),
-		Member: chat.Member{Name: "jami"},
+		Member: chat.Member{Name: "user"},
 	})
 
 	next, cmd := m.Update(tui.QuitRequested{})
@@ -154,9 +187,7 @@ func TestQuitRequestedClosesSubscriptionBeforeQuit(t *testing.T) {
 	if !m.closed {
 		t.Fatal("session should be marked closed")
 	}
-	if _, ok := <-m.subscription.Events(); ok {
-		t.Fatal("subscription events should be closed")
-	}
+	assertSubscriptionClosed(t, m.subscription)
 }
 
 func TestWaitForRoomEventClosesSubscriptionOnContextCancel(t *testing.T) {
@@ -166,16 +197,14 @@ func TestWaitForRoomEventClosesSubscriptionOnContextCancel(t *testing.T) {
 		Height:  8,
 		Context: ctx,
 		Room:    chat.NewRoom(),
-		Member:  chat.Member{Name: "jami"},
+		Member:  chat.Member{Name: "user"},
 	})
 
 	cancel()
 	if msg := m.waitForRoomEvent()(); msg != nil {
 		t.Fatalf("wait command returned %T, want nil", msg)
 	}
-	if _, ok := <-m.subscription.Events(); ok {
-		t.Fatal("subscription events should be closed")
-	}
+	assertSubscriptionClosed(t, m.subscription)
 }
 
 func newModel(t *testing.T, config Config) model {
@@ -196,4 +225,37 @@ func assertModel(t *testing.T, tm tea.Model) model {
 		t.Fatalf("updated model has type %T, want model", tm)
 	}
 	return m
+}
+
+func nextRoomEvent(t *testing.T, subscription *chat.Subscription, kind chat.EventKind) chat.Event {
+	t.Helper()
+
+	for {
+		select {
+		case event, ok := <-subscription.Events():
+			if !ok {
+				t.Fatalf("subscription closed before event kind %d", kind)
+			}
+			if event.Kind == kind {
+				return event
+			}
+		case <-time.After(100 * time.Millisecond):
+			t.Fatalf("timed out waiting for event kind %d", kind)
+		}
+	}
+}
+
+func assertSubscriptionClosed(t *testing.T, subscription *chat.Subscription) {
+	t.Helper()
+
+	for {
+		select {
+		case _, ok := <-subscription.Events():
+			if !ok {
+				return
+			}
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("subscription events should be closed")
+		}
+	}
 }

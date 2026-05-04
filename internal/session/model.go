@@ -2,11 +2,14 @@ package session
 
 import (
 	"context"
+	"fmt"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/luojam/ssh-chat/internal/chat"
 	"github.com/luojam/ssh-chat/internal/tui"
 )
+
+const systemAuthor = "system"
 
 type Config struct {
 	Width   int
@@ -26,7 +29,7 @@ func New(config Config) tea.Model {
 		ctx:          ctx,
 		room:         config.Room,
 		member:       config.Member,
-		subscription: config.Room.Subscribe(),
+		subscription: config.Room.Join(config.Member),
 		ui: tui.New(tui.Config{
 			Width:  config.Width,
 			Height: config.Height,
@@ -59,10 +62,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tui.SendRequested:
 		return m, m.postMessage(msg.Body)
 	case roomEvent:
-		display := tui.MessageReceived{
-			Author: msg.event.Message.Author.Name,
-			Body:   msg.event.Message.Body,
-			Mine:   msg.event.Message.Author.Name == m.member.Name,
+		display, ok := m.displayMessage(msg.event)
+		if !ok {
+			return m, m.waitForRoomEvent()
 		}
 		var cmd tea.Cmd
 		m.ui, cmd = m.ui.Update(display)
@@ -94,12 +96,42 @@ func (m model) waitForRoomEvent() tea.Cmd {
 		case <-m.ctx.Done():
 			m.subscription.Close()
 			return nil
+		default:
+		}
+
+		select {
+		case <-m.ctx.Done():
+			m.subscription.Close()
+			return nil
 		case event, ok := <-m.subscription.Events():
 			if !ok {
 				return nil
 			}
 			return roomEvent{event: event}
 		}
+	}
+}
+
+func (m model) displayMessage(event chat.Event) (tui.MessageReceived, bool) {
+	switch event.Kind {
+	case chat.MessagePosted:
+		return tui.MessageReceived{
+			Author: event.Message.Author.Name,
+			Body:   event.Message.Body,
+			Mine:   event.Message.Author.Name == m.member.Name,
+		}, true
+	case chat.MemberJoined:
+		return tui.MessageReceived{
+			Author: systemAuthor,
+			Body:   fmt.Sprintf("%s joined", event.Member.Name),
+		}, true
+	case chat.MemberLeft:
+		return tui.MessageReceived{
+			Author: systemAuthor,
+			Body:   fmt.Sprintf("%s left", event.Member.Name),
+		}, true
+	default:
+		return tui.MessageReceived{}, false
 	}
 }
 
