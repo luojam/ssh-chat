@@ -118,7 +118,7 @@ func (m model) displayMessage(event chat.Event) (tui.MessageReceived, bool) {
 		return tui.MessageReceived{
 			Author: event.Message.Author.Name,
 			Body:   event.Message.Body,
-			Mine:   event.Message.Author.Name == m.member.Name,
+			Mine:   event.Message.Author.ID == m.member.ID,
 		}, true
 	case chat.MemberJoined:
 		return tui.MessageReceived{

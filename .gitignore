@@ -4,7 +4,7 @@
 *.exe
 *.test
 *.out
-ssh-chat
+/ssh-chat
 
 # Coverage and profiling
 coverage.*

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"net"
 	"os"
@@ -85,15 +87,30 @@ func teaHandler(sess ssh.Session, room *chat.Room) (tea.Model, []tea.ProgramOpti
 		return nil, nil
 	}
 
+	id, err := newSessionMemberID()
+	if err != nil {
+		log.Error("Could not create member ID", "error", err)
+		return nil, nil
+	}
+
 	return session.New(session.Config{
 		Width:   pty.Window.Width,
 		Height:  pty.Window.Height,
 		Context: sess.Context(),
 		Room:    room,
 		Member: chat.Member{
+			ID:   id,
 			Name: memberName(sess),
 		},
 	}), []tea.ProgramOption{tea.WithContext(sess.Context())}
+}
+
+func newSessionMemberID() (chat.MemberID, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return chat.MemberID(hex.EncodeToString(b[:])), nil
 }
 
 func memberName(sess ssh.Session) string {

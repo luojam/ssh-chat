@@ -12,7 +12,10 @@ var ErrEmptyMessage = errors.New("empty message")
 const subscriptionBuffer = 16
 const historyLimit = subscriptionBuffer
 
+type MemberID string
+
 type Member struct {
+	ID   MemberID
 	Name string
 }
 

@@ -9,7 +9,7 @@ import (
 
 func TestRoomPostStoresTrimmedMessage(t *testing.T) {
 	room := NewRoom()
-	author := Member{Name: "user"}
+	author := Member{ID: "user-1", Name: "user"}
 
 	msg, err := room.Post(author, " hello ")
 	if err != nil {
@@ -38,7 +38,7 @@ func TestRoomPostBroadcastsToSubscribers(t *testing.T) {
 	subscription := room.Subscribe()
 	defer subscription.Close()
 
-	msg, err := room.Post(Member{Name: "user"}, "hello")
+	msg, err := room.Post(Member{ID: "user-1", Name: "user"}, "hello")
 	if err != nil {
 		t.Fatalf("Post returned error: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestRoomPostBroadcastsToSubscribers(t *testing.T) {
 
 func TestRoomJoinBroadcastsMemberJoined(t *testing.T) {
 	room := NewRoom()
-	first := room.Join(Member{Name: "user"})
+	first := room.Join(Member{ID: "user-1", Name: "user"})
 	defer first.Close()
 
 	event := assertNextEvent(t, first)
@@ -74,11 +74,11 @@ func TestRoomJoinBroadcastsMemberJoined(t *testing.T) {
 
 func TestJoinedSubscriptionCloseBroadcastsMemberLeft(t *testing.T) {
 	room := NewRoom()
-	first := room.Join(Member{Name: "user"})
+	first := room.Join(Member{ID: "user-1", Name: "user"})
 	defer first.Close()
 	_ = assertNextEvent(t, first)
 
-	second := room.Join(Member{Name: "sara"})
+	second := room.Join(Member{ID: "sara-1", Name: "sara"})
 	defer second.Close()
 	_ = assertNextEvent(t, first)
 	_ = assertNextEvent(t, second)
@@ -97,11 +97,11 @@ func TestJoinedSubscriptionCloseBroadcastsMemberLeft(t *testing.T) {
 func TestRoomPostAssignsSequentialMessageIDs(t *testing.T) {
 	room := NewRoom()
 
-	first, err := room.Post(Member{Name: "user"}, "first")
+	first, err := room.Post(Member{ID: "user-1", Name: "user"}, "first")
 	if err != nil {
 		t.Fatalf("Post returned error: %v", err)
 	}
-	second, err := room.Post(Member{Name: "user"}, "second")
+	second, err := room.Post(Member{ID: "user-1", Name: "user"}, "second")
 	if err != nil {
 		t.Fatalf("Post returned error: %v", err)
 	}
@@ -116,11 +116,11 @@ func TestRoomPostAssignsSequentialMessageIDs(t *testing.T) {
 
 func TestRoomSubscribeReplaysHistory(t *testing.T) {
 	room := NewRoom()
-	first, err := room.Post(Member{Name: "user"}, "first")
+	first, err := room.Post(Member{ID: "user-1", Name: "user"}, "first")
 	if err != nil {
 		t.Fatalf("Post returned error: %v", err)
 	}
-	second, err := room.Post(Member{Name: "sara"}, "second")
+	second, err := room.Post(Member{ID: "sara-1", Name: "sara"}, "second")
 	if err != nil {
 		t.Fatalf("Post returned error: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestRoomSubscribeReplaysHistory(t *testing.T) {
 func TestRoomSubscribeReplaysRecentHistoryOnly(t *testing.T) {
 	room := NewRoom()
 	for i := 0; i < historyLimit+1; i++ {
-		if _, err := room.Post(Member{Name: "user"}, fmt.Sprintf("message-%02d", i)); err != nil {
+		if _, err := room.Post(Member{ID: "user-1", Name: "user"}, fmt.Sprintf("message-%02d", i)); err != nil {
 			t.Fatalf("Post returned error: %v", err)
 		}
 	}
@@ -161,7 +161,7 @@ func TestRoomPostDropsSlowSubscriber(t *testing.T) {
 	defer fast.Close()
 
 	for i := 0; i < subscriptionBuffer; i++ {
-		if _, err := room.Post(Member{Name: "user"}, "hello"); err != nil {
+		if _, err := room.Post(Member{ID: "user-1", Name: "user"}, "hello"); err != nil {
 			t.Fatalf("Post returned error: %v", err)
 		}
 		<-fast.Events()
@@ -170,7 +170,7 @@ func TestRoomPostDropsSlowSubscriber(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		_, _ = room.Post(Member{Name: "user"}, "overflow")
+		_, _ = room.Post(Member{ID: "user-1", Name: "user"}, "overflow")
 	}()
 
 	select {
@@ -203,7 +203,7 @@ func TestRoomPostDropsSlowSubscriber(t *testing.T) {
 func TestRoomPostRejectsEmptyMessage(t *testing.T) {
 	room := NewRoom()
 
-	_, err := room.Post(Member{Name: "user"}, "   ")
+	_, err := room.Post(Member{ID: "user-1", Name: "user"}, "   ")
 	if !errors.Is(err, ErrEmptyMessage) {
 		t.Fatalf("error = %v, want ErrEmptyMessage", err)
 	}

@@ -16,7 +16,7 @@ func TestSendRequestedPostsToRoomAndRoomEventUpdatesTUI(t *testing.T) {
 		Width:  40,
 		Height: 8,
 		Room:   chat.NewRoom(),
-		Member: chat.Member{Name: "user"},
+		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
 
 	next, cmd := m.Update(tui.SendRequested{Body: "hello"})
@@ -43,14 +43,14 @@ func TestRoomEventMarksOtherMemberMessageAsNotMine(t *testing.T) {
 		Width:  40,
 		Height: 8,
 		Room:   chat.NewRoom(),
-		Member: chat.Member{Name: "user"},
+		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
 
 	next, _ := m.Update(roomEvent{
 		event: chat.Event{
 			Kind: chat.MessagePosted,
 			Message: chat.Message{
-				Author: chat.Member{Name: "sara"},
+				Author: chat.Member{ID: "sara-1", Name: "sara"},
 				Body:   "hello",
 			},
 		},
@@ -66,19 +66,47 @@ func TestRoomEventMarksOtherMemberMessageAsNotMine(t *testing.T) {
 	}
 }
 
+func TestRoomEventUsesMemberIDForMine(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+
+	next, _ := m.Update(roomEvent{
+		event: chat.Event{
+			Kind: chat.MessagePosted,
+			Message: chat.Message{
+				Author: chat.Member{ID: "user-2", Name: "user"},
+				Body:   "same display name",
+			},
+		},
+	})
+	m = assertModel(t, next)
+
+	view := m.View()
+	if !strings.Contains(view.Content, "user") || !strings.Contains(view.Content, "same display name") {
+		t.Fatalf("view should render message from duplicate-name member, got %q", view.Content)
+	}
+	if strings.Contains(view.Content, "you") {
+		t.Fatalf("duplicate display name should not render as local author, got %q", view.Content)
+	}
+}
+
 func TestRoomBroadcastReachesMultipleSessions(t *testing.T) {
 	room := chat.NewRoom()
 	user := newModel(t, Config{
 		Width:  40,
 		Height: 8,
 		Room:   room,
-		Member: chat.Member{Name: "user"},
+		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
 	sara := newModel(t, Config{
 		Width:  40,
 		Height: 8,
 		Room:   room,
-		Member: chat.Member{Name: "sara"},
+		Member: chat.Member{ID: "sara-1", Name: "sara"},
 	})
 
 	_, cmd := user.Update(tui.SendRequested{Body: "hello"})
@@ -113,7 +141,7 @@ func TestRoomBroadcastReachesMultipleSessions(t *testing.T) {
 
 func TestNewSessionCanRenderRoomHistory(t *testing.T) {
 	room := chat.NewRoom()
-	if _, err := room.Post(chat.Member{Name: "user"}, "before join"); err != nil {
+	if _, err := room.Post(chat.Member{ID: "user-1", Name: "user"}, "before join"); err != nil {
 		t.Fatalf("Post returned error: %v", err)
 	}
 
@@ -121,7 +149,7 @@ func TestNewSessionCanRenderRoomHistory(t *testing.T) {
 		Width:  40,
 		Height: 8,
 		Room:   room,
-		Member: chat.Member{Name: "sara"},
+		Member: chat.Member{ID: "sara-1", Name: "sara"},
 	})
 
 	event := <-sara.subscription.Events()
@@ -139,7 +167,7 @@ func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
 		Width:  40,
 		Height: 8,
 		Room:   chat.NewRoom(),
-		Member: chat.Member{Name: "user"},
+		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
 
 	event := nextRoomEvent(t, m.subscription, chat.MemberJoined)
@@ -154,7 +182,7 @@ func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
 	next, _ = m.Update(roomEvent{
 		event: chat.Event{
 			Kind:   chat.MemberLeft,
-			Member: chat.Member{Name: "sara"},
+			Member: chat.Member{ID: "sara-1", Name: "sara"},
 		},
 	})
 	m = assertModel(t, next)
@@ -170,7 +198,7 @@ func TestQuitRequestedClosesSubscriptionBeforeQuit(t *testing.T) {
 		Width:  40,
 		Height: 8,
 		Room:   chat.NewRoom(),
-		Member: chat.Member{Name: "user"},
+		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
 
 	next, cmd := m.Update(tui.QuitRequested{})
@@ -197,7 +225,7 @@ func TestWaitForRoomEventClosesSubscriptionOnContextCancel(t *testing.T) {
 		Height:  8,
 		Context: ctx,
 		Room:    chat.NewRoom(),
-		Member:  chat.Member{Name: "user"},
+		Member:  chat.Member{ID: "user-1", Name: "user"},
 	})
 
 	cancel()
