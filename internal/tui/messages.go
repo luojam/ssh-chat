@@ -29,6 +29,10 @@ type SendRequested struct {
 	Body string
 }
 
+// QuitRequested lets the session layer release per-connection resources before
+// it asks Bubble Tea to stop the program.
+type QuitRequested struct{}
+
 // MessageReceived is display data for the terminal. Backend message IDs,
 // delivery rules, and storage details stay outside the TUI.
 type MessageReceived struct {
@@ -55,6 +59,10 @@ func (m *model) requestSend() tea.Cmd {
 	return func() tea.Msg {
 		return SendRequested{Body: body}
 	}
+}
+
+func requestQuit() tea.Msg {
+	return QuitRequested{}
 }
 
 func (m *model) receiveMessage(msg MessageReceived) {

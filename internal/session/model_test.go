@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -105,6 +106,75 @@ func TestRoomBroadcastReachesMultipleSessions(t *testing.T) {
 	}
 	if strings.Contains(saraView.Content, "you") {
 		t.Fatalf("receiver view should not mark sender message as local, got %q", saraView.Content)
+	}
+}
+
+func TestNewSessionCanRenderRoomHistory(t *testing.T) {
+	room := chat.NewRoom()
+	if _, err := room.Post(chat.Member{Name: "jami"}, "before join"); err != nil {
+		t.Fatalf("Post returned error: %v", err)
+	}
+
+	sara := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   room,
+		Member: chat.Member{Name: "sara"},
+	})
+
+	event := <-sara.subscription.Events()
+	next, _ := sara.Update(roomEvent{event: event})
+	sara = assertModel(t, next)
+
+	view := sara.View()
+	if !strings.Contains(view.Content, "jami") || !strings.Contains(view.Content, "before join") {
+		t.Fatalf("new session should render room history, got %q", view.Content)
+	}
+}
+
+func TestQuitRequestedClosesSubscriptionBeforeQuit(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{Name: "jami"},
+	})
+
+	next, cmd := m.Update(tui.QuitRequested{})
+	if cmd == nil {
+		t.Fatal("QuitRequested should return a quit command")
+	}
+	if msg := cmd(); msg == nil {
+		t.Fatal("quit command returned nil")
+	} else if _, ok := msg.(tea.QuitMsg); !ok {
+		t.Fatalf("quit command returned %T, want tea.QuitMsg", msg)
+	}
+
+	m = assertModel(t, next)
+	if !m.closed {
+		t.Fatal("session should be marked closed")
+	}
+	if _, ok := <-m.subscription.Events(); ok {
+		t.Fatal("subscription events should be closed")
+	}
+}
+
+func TestWaitForRoomEventClosesSubscriptionOnContextCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	m := newModel(t, Config{
+		Width:   40,
+		Height:  8,
+		Context: ctx,
+		Room:    chat.NewRoom(),
+		Member:  chat.Member{Name: "jami"},
+	})
+
+	cancel()
+	if msg := m.waitForRoomEvent()(); msg != nil {
+		t.Fatalf("wait command returned %T, want nil", msg)
+	}
+	if _, ok := <-m.subscription.Events(); ok {
+		t.Fatal("subscription events should be closed")
 	}
 }
 

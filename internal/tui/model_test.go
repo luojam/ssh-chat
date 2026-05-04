@@ -142,7 +142,7 @@ func TestQIsNormalInput(t *testing.T) {
 	}
 }
 
-func TestCtrlCAndEscQuit(t *testing.T) {
+func TestCtrlCAndEscRequestQuit(t *testing.T) {
 	for _, msg := range []tea.KeyPressMsg{
 		keyCtrl("c"),
 		keySpecial(tea.KeyEsc),
@@ -153,8 +153,8 @@ func TestCtrlCAndEscQuit(t *testing.T) {
 			t.Fatal("expected quit command, got nil")
 		}
 		msg := cmd()
-		if _, ok := msg.(tea.QuitMsg); !ok {
-			t.Fatalf("expected tea.QuitMsg, got %T", msg)
+		if _, ok := msg.(QuitRequested); !ok {
+			t.Fatalf("expected QuitRequested, got %T", msg)
 		}
 	}
 }

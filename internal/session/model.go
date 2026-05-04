@@ -39,6 +39,7 @@ type model struct {
 	room         *chat.Room
 	member       chat.Member
 	subscription *chat.Subscription
+	closed       bool
 	ui           tea.Model
 }
 
@@ -52,6 +53,9 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tui.QuitRequested:
+		m.close()
+		return m, tea.Quit
 	case tui.SendRequested:
 		return m, m.postMessage(msg.Body)
 	case roomEvent:
@@ -76,6 +80,9 @@ func (m model) View() tea.View {
 
 func (m model) postMessage(body string) tea.Cmd {
 	return func() tea.Msg {
+		if m.closed {
+			return nil
+		}
 		_, _ = m.room.Post(m.member, body)
 		return nil
 	}
@@ -94,4 +101,12 @@ func (m model) waitForRoomEvent() tea.Cmd {
 			return roomEvent{event: event}
 		}
 	}
+}
+
+func (m *model) close() {
+	if m.closed {
+		return
+	}
+	m.closed = true
+	m.subscription.Close()
 }

@@ -72,7 +72,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	switch msg.String() {
 	case keyQuitCtrlC, keyQuitEsc:
-		return true, tea.Quit
+		return true, requestQuit
 	case keySend:
 		return true, m.requestSend()
 	default:

@@ -9,6 +9,9 @@ import (
 
 var ErrEmptyMessage = errors.New("empty message")
 
+const subscriptionBuffer = 16
+const historyLimit = subscriptionBuffer
+
 type Member struct {
 	Name string
 }
@@ -49,11 +52,16 @@ func NewRoom() *Room {
 }
 
 func (r *Room) Subscribe() *Subscription {
-	events := make(chan Event, 16)
+	events := make(chan Event, subscriptionBuffer)
 
 	r.mu.Lock()
+	history := r.history()
 	r.subscribers[events] = struct{}{}
 	r.mu.Unlock()
+
+	for _, msg := range history {
+		events <- Event{Message: msg}
+	}
 
 	return &Subscription{
 		events: events,
@@ -90,8 +98,22 @@ func (r *Room) Post(author Member, body string) (Message, error) {
 	defer r.mu.Unlock()
 	r.messages = append(r.messages, msg)
 	for subscriber := range r.subscribers {
-		subscriber <- event
+		select {
+		case subscriber <- event:
+		default:
+			// A full subscriber is not keeping up with room traffic. Closing it
+			// keeps one slow SSH session from blocking every other participant.
+			delete(r.subscribers, subscriber)
+			close(subscriber)
+		}
 	}
 
 	return msg, nil
+}
+
+func (r *Room) history() []Message {
+	start := max(0, len(r.messages)-historyLimit)
+	history := make([]Message, len(r.messages[start:]))
+	copy(history, r.messages[start:])
+	return history
 }
