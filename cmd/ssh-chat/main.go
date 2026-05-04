@@ -16,7 +16,8 @@ import (
 	"charm.land/wish/v2/bubbletea"
 	"charm.land/wish/v2/logging"
 	"github.com/charmbracelet/ssh"
-	"github.com/luojam/ssh-chat/internal/tui"
+	"github.com/luojam/ssh-chat/internal/chat"
+	"github.com/luojam/ssh-chat/internal/session"
 )
 
 const (
@@ -24,9 +25,12 @@ const (
 	port          = "2222"
 	hostKeyPath   = ".ssh/id_ed25519"
 	validPassword = "password"
+	defaultMember = "anonymous"
 )
 
 func main() {
+	room := chat.NewRoom()
+
 	s, err := wish.NewServer(
 		wish.WithAddress(net.JoinHostPort(host, port)),
 		wish.WithHostKeyPath(hostKeyPath),
@@ -43,7 +47,9 @@ func main() {
 		// view of the whole flow, lets activeterm reject clients without a usable
 		// terminal, and only then starts one Bubble Tea program for the session.
 		wish.WithMiddleware(
-			bubbletea.Middleware(teaHandler),
+			bubbletea.Middleware(func(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
+				return teaHandler(sess, room)
+			}),
 			activeterm.Middleware(),
 			logging.Middleware(),
 		),
@@ -71,7 +77,7 @@ func main() {
 	}
 }
 
-func teaHandler(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
+func teaHandler(sess ssh.Session, room *chat.Room) (tea.Model, []tea.ProgramOption) {
 	pty, _, ok := sess.Pty()
 	if !ok {
 		// Wish's active-terminal middleware should reject this earlier, but keeping
@@ -79,8 +85,21 @@ func teaHandler(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
 		return nil, nil
 	}
 
-	return tui.New(tui.Config{
-		Width:  pty.Window.Width,
-		Height: pty.Window.Height,
-	}), []tea.ProgramOption{}
+	return session.New(session.Config{
+		Width:   pty.Window.Width,
+		Height:  pty.Window.Height,
+		Context: sess.Context(),
+		Room:    room,
+		Member: chat.Member{
+			Name: memberName(sess),
+		},
+	}), []tea.ProgramOption{tea.WithContext(sess.Context())}
+}
+
+func memberName(sess ssh.Session) string {
+	name := sess.User()
+	if name == "" {
+		return defaultMember
+	}
+	return name
 }

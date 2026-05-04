@@ -56,6 +56,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setDark(msg.IsDark())
 	case tea.WindowSizeMsg:
 		m.resize(msg.Width, msg.Height)
+	case MessageReceived:
+		m.receiveMessage(msg)
 	case tea.KeyPressMsg:
 		if handled, cmd := m.handleKeyPress(msg); handled {
 			return m, cmd
@@ -72,8 +74,7 @@ func (m *model) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	case keyQuitCtrlC, keyQuitEsc:
 		return true, tea.Quit
 	case keySend:
-		m.sendLocalMessage()
-		return true, nil
+		return true, m.requestSend()
 	default:
 		return false, nil
 	}

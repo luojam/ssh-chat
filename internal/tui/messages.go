@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -22,6 +23,20 @@ type message struct {
 	mine   bool
 }
 
+// SendRequested is an intent from the interface, not an accepted chat message.
+// The session layer decides whether this becomes backend state.
+type SendRequested struct {
+	Body string
+}
+
+// MessageReceived is display data for the terminal. Backend message IDs,
+// delivery rules, and storage details stay outside the TUI.
+type MessageReceived struct {
+	Author string
+	Body   string
+	Mine   bool
+}
+
 func newMessageViewport() viewport.Model {
 	vp := viewport.New()
 	vp.SoftWrap = false
@@ -30,20 +45,24 @@ func newMessageViewport() viewport.Model {
 	return vp
 }
 
-// Local echo is the first message source. Network delivery can use the same
-// message type later without coupling the renderer to SSH session details.
-func (m *model) sendLocalMessage() {
+func (m *model) requestSend() tea.Cmd {
 	body := strings.TrimSpace(m.input.Value())
 	if body == "" {
-		return
+		return nil
 	}
 
-	m.messages = append(m.messages, message{
-		author: localAuthor,
-		body:   body,
-		mine:   true,
-	})
 	m.input.Reset()
+	return func() tea.Msg {
+		return SendRequested{Body: body}
+	}
+}
+
+func (m *model) receiveMessage(msg MessageReceived) {
+	m.messages = append(m.messages, message{
+		author: msg.Author,
+		body:   msg.Body,
+		mine:   msg.Mine,
+	})
 	m.syncMessageViewport()
 }
 

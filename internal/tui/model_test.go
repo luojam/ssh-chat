@@ -39,22 +39,31 @@ func TestInitialLayoutUsesFullFrame(t *testing.T) {
 	}
 }
 
-func TestEnterAppendsLocalMessageAndClearsInput(t *testing.T) {
+func TestEnterRequestsSendAndClearsInput(t *testing.T) {
 	m := newModel(t, Config{Width: 40, Height: 8})
 
 	m = updateModel(t, m, keyText("h"))
 	m = updateModel(t, m, keyText("i"))
-	m = updateModel(t, m, keySpecial(tea.KeyEnter))
+	m, cmd := updateModelWithCmd(t, m, keySpecial(tea.KeyEnter))
 
-	if got := len(m.messages); got != 1 {
-		t.Fatalf("message count = %d, want 1", got)
+	if cmd == nil {
+		t.Fatal("enter should request send, got nil command")
 	}
-	if got := m.messages[0].body; got != "hi" {
-		t.Fatalf("message body = %q, want %q", got, "hi")
+	msg, ok := cmd().(SendRequested)
+	if !ok {
+		t.Fatalf("enter command returned %T, want SendRequested", msg)
+	}
+	if got := msg.Body; got != "hi" {
+		t.Fatalf("send body = %q, want %q", got, "hi")
 	}
 	if got := m.input.Value(); got != "" {
 		t.Fatalf("input value = %q, want empty", got)
 	}
+	if got := len(m.messages); got != 0 {
+		t.Fatalf("message count = %d, want 0 before display event", got)
+	}
+
+	m = updateModel(t, m, MessageReceived{Body: msg.Body, Mine: true})
 
 	view := m.View()
 	if !view.AltScreen {
@@ -68,9 +77,7 @@ func TestEnterAppendsLocalMessageAndClearsInput(t *testing.T) {
 func TestShortHistoryRendersAboveComposer(t *testing.T) {
 	m := newModel(t, Config{Width: 40, Height: 8})
 
-	m = updateModel(t, m, keyText("h"))
-	m = updateModel(t, m, keyText("i"))
-	m = updateModel(t, m, keySpecial(tea.KeyEnter))
+	m = updateModel(t, m, MessageReceived{Body: "hi", Mine: true})
 
 	lines := strings.Split(m.View().Content, "\n")
 	if strings.Contains(lines[1], localAuthor) || strings.Contains(lines[1], "hi") {
@@ -166,12 +173,19 @@ func newModel(t *testing.T, config Config) model {
 func updateModel(t *testing.T, m model, msg tea.Msg) model {
 	t.Helper()
 
-	next, _ := m.Update(msg)
+	next, _ := updateModelWithCmd(t, m, msg)
+	return next
+}
+
+func updateModelWithCmd(t *testing.T, m model, msg tea.Msg) (model, tea.Cmd) {
+	t.Helper()
+
+	next, cmd := m.Update(msg)
 	updated, ok := next.(model)
 	if !ok {
 		t.Fatalf("updated model has type %T, want model", next)
 	}
-	return updated
+	return updated, cmd
 }
 
 func keyText(s string) tea.KeyPressMsg {
