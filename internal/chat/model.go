@@ -86,7 +86,8 @@ func (r *Room) Subscribe() *Subscription {
 }
 
 // Join is like Subscribe, but associates the subscription with member and announces
-// their presence: other subscribers receive MemberJoined, and MemberLeft when Close runs.
+// their presence: all subscribers, including the joining member, receive MemberJoined;
+// remaining subscribers receive MemberLeft when Close runs.
 func (r *Room) Join(member Member) *Subscription {
 	return r.subscribe(member, true)
 }

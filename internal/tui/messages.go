@@ -33,7 +33,8 @@ type SendRequested struct {
 // it asks Bubble Tea to stop the program.
 type QuitRequested struct{}
 
-// ContinueRequested triggered on enter in welcome screen
+// ContinueRequested is emitted by the welcome view when the user chooses to
+// enter the chat view.
 type ContinueRequested struct{}
 
 // MessageReceived is display data for the terminal. Backend message IDs,

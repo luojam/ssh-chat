@@ -7,9 +7,9 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// renderFullWidth renders a single-row component that owns a whole terminal row.
-// rows: callers provide their desired content, and this function clips it to the
-// available cells before Lip Gloss pads the row out to the exact frame width.
+// renderFullWidth renders a single-row line that owns a whole terminal row.
+// Callers provide their desired content, and this function clips it to the
+// available cells before Lip Gloss pads the line out to the exact frame width.
 func renderFullWidth(style lipgloss.Style, width int, content string) string {
 	width = safeDimension(width)
 	return style.Width(width).Render(ansi.Truncate(content, width, ""))

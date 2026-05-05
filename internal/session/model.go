@@ -64,6 +64,9 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// The session model owns cross-view state: room membership, current terminal
+	// size, and which TUI model is active. View-specific messages are handled here
+	// only when they affect that shared state; everything else is delegated below.
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
