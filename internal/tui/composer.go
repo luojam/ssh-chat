@@ -39,9 +39,9 @@ func (m model) renderComposer(width int) string {
 }
 
 // renderComposerSection draws optional separator lines above and below the input row.
-func (m model) renderComposerSection(width, frameHeight int) string {
+func (m model) renderComposerSection(width int, showFrame bool) string {
 	line := m.renderComposer(width)
-	if !inputFrameVisible(frameHeight) {
+	if !showFrame {
 		return line
 	}
 	return lipgloss.JoinVertical(lipgloss.Left,

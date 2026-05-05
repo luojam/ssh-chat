@@ -7,8 +7,15 @@ type frameSize struct {
 	height int
 }
 
-func (m model) frame() frameSize {
-	return safeFrameSize(m.width, m.height)
+// chatLayout is the small contract between sizing and rendering.
+// Keeping every row decision here prevents render paths and viewport sizing from
+// drifting apart as the TUI grows.
+type chatLayout struct {
+	width          int
+	height         int
+	messageRows    int
+	showHeader     bool
+	showInputFrame bool
 }
 
 func safeFrameSize(width, height int) frameSize {
@@ -22,8 +29,29 @@ func (m model) frameWidth() int {
 	return safeDimension(m.width)
 }
 
-func (m model) messageAreaHeight() int {
-	return messageAreaHeight(safeDimension(m.height))
+func (m model) layout() chatLayout {
+	return chatLayoutFor(m.width, m.height)
+}
+
+func chatLayoutFor(width, height int) chatLayout {
+	frame := safeFrameSize(width, height)
+	layout := chatLayout{
+		width:          frame.width,
+		height:         frame.height,
+		showHeader:     frame.height >= 3,
+		showInputFrame: inputFrameVisible(frame.height),
+	}
+
+	usedRows := 1 // The composer is always visible; it is the primary input affordance.
+	if layout.showHeader {
+		usedRows += 2 // Header title plus divider.
+	}
+	if layout.showInputFrame {
+		usedRows += 2 // Separators above and below the composer.
+	}
+	layout.messageRows = max(0, frame.height-usedRows)
+
+	return layout
 }
 
 // Bubble Tea can send zero dimensions before the first resize message.
@@ -40,20 +68,4 @@ func inputWidth(width int) int {
 // header, header divider, separators, and at least one message row fit.
 func inputFrameVisible(frameHeight int) bool {
 	return frameHeight >= 6
-}
-
-func messageAreaHeight(frameHeight int) int {
-	switch {
-	case frameHeight <= 1:
-		return 0
-	case frameHeight == 2:
-		return 1
-	default:
-		footerRows := 1
-		if inputFrameVisible(frameHeight) {
-			footerRows = 3 // separator + composer + separator
-		}
-		// Two rows for title and divider.
-		return max(1, frameHeight-2-footerRows)
-	}
 }

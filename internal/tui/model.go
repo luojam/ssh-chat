@@ -113,24 +113,19 @@ func (m *model) syncComposer() {
 }
 
 func (m model) render() string {
-	frame := m.frame()
+	layout := m.layout()
+	sections := make([]string, 0, 4)
 
-	switch frame.height {
-	case 1:
-		return m.renderComposer(frame.width)
-	case 2:
-		return lipgloss.JoinVertical(
-			lipgloss.Left,
-			m.renderMessages(),
-			m.renderComposer(frame.width),
-		)
-	default:
-		return lipgloss.JoinVertical(
-			lipgloss.Left,
-			m.renderHeader(frame.width),
-			m.renderHeaderDivider(frame.width),
-			m.renderMessages(),
-			m.renderComposerSection(frame.width, frame.height),
+	if layout.showHeader {
+		sections = append(sections,
+			m.renderHeader(layout.width),
+			m.renderHeaderDivider(layout.width),
 		)
 	}
+	if layout.messageRows > 0 {
+		sections = append(sections, m.renderMessages())
+	}
+	sections = append(sections, m.renderComposerSection(layout.width, layout.showInputFrame))
+
+	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }

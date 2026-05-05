@@ -86,12 +86,11 @@ func (m *model) receiveMessage(msg MessageReceived) {
 // models often carry state such as scroll position; rendering should observe it.
 func (m *model) syncMessageViewport(follow bool) {
 	wasAtBottom := m.viewport.AtBottom()
-	width := m.frameWidth()
-	height := m.messageAreaHeight()
+	layout := m.layout()
 
-	m.viewport.SetWidth(width)
-	m.viewport.SetHeight(height)
-	m.viewport.SetContentLines(m.bottomAlignedMessageLines(width, height))
+	m.viewport.SetWidth(layout.width)
+	m.viewport.SetHeight(layout.messageRows)
+	m.viewport.SetContentLines(m.bottomAlignedMessageLines(layout.width, layout.messageRows))
 	if follow || wasAtBottom {
 		m.viewport.GotoBottom()
 	}

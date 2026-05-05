@@ -52,6 +52,17 @@ func TestInitialLayoutUsesFullFrame(t *testing.T) {
 	}
 }
 
+func TestTinyLayoutsUseFullFrameHeight(t *testing.T) {
+	for height := 1; height <= 8; height++ {
+		m := newModel(t, Config{Width: 40, Height: height})
+
+		lines := strings.Split(m.View().Content, "\n")
+		if got := len(lines); got != height {
+			t.Fatalf("height %d rendered %d rows; content = %q", height, got, m.View().Content)
+		}
+	}
+}
+
 func TestEnterRequestsSendAndClearsInput(t *testing.T) {
 	m := newModel(t, Config{Width: 40, Height: 8})
 
