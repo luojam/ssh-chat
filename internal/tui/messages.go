@@ -79,19 +79,22 @@ func (m *model) receiveMessage(msg MessageReceived) {
 		body:   msg.Body,
 		mine:   msg.Mine,
 	})
-	m.syncMessageViewport()
+	m.syncMessageViewport(true)
 }
 
 // Keep viewport synchronization in mutation paths, not View. Bubble Tea child
 // models often carry state such as scroll position; rendering should observe it.
-func (m *model) syncMessageViewport() {
+func (m *model) syncMessageViewport(follow bool) {
+	wasAtBottom := m.viewport.AtBottom()
 	width := m.frameWidth()
 	height := m.messageAreaHeight()
 
 	m.viewport.SetWidth(width)
 	m.viewport.SetHeight(height)
 	m.viewport.SetContentLines(m.bottomAlignedMessageLines(width, height))
-	m.viewport.GotoBottom()
+	if follow || wasAtBottom {
+		m.viewport.GotoBottom()
+	}
 }
 
 func (m model) renderMessages() string {

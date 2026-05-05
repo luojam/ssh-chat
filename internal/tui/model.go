@@ -95,7 +95,7 @@ func (m *model) setDark(isDark bool) {
 	m.isDark = isDark
 	m.styles = newStyles(isDark)
 	m.input.SetStyles(inputStyles(isDark))
-	m.syncMessageViewport()
+	m.syncMessageViewport(false)
 }
 
 func (m *model) resize(width, height int) {
@@ -103,7 +103,7 @@ func (m *model) resize(width, height int) {
 	m.height = height
 
 	m.syncComposer()
-	m.syncMessageViewport()
+	m.syncMessageViewport(false)
 }
 
 func (m *model) syncComposer() {

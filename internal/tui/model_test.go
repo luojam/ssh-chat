@@ -102,6 +102,37 @@ func TestShortHistoryRendersAboveComposer(t *testing.T) {
 	}
 }
 
+func TestViewportSyncPreservesScrollOnResizeAndThemeChange(t *testing.T) {
+	m := newModel(t, Config{Width: 40, Height: 8})
+	for i := 0; i < 10; i++ {
+		m = updateModel(t, m, MessageReceived{Body: "message", Mine: true})
+	}
+	if !m.viewport.AtBottom() {
+		t.Fatal("received messages should follow to bottom")
+	}
+	bottomOffset := m.viewport.YOffset()
+	if bottomOffset == 0 {
+		t.Fatal("test setup needs scrollable message content")
+	}
+
+	scrolledOffset := bottomOffset - 1
+	m.viewport.SetYOffset(scrolledOffset)
+	m.resize(50, 8)
+	if got := m.viewport.YOffset(); got != scrolledOffset {
+		t.Fatalf("resize y offset = %d, want preserved offset %d", got, scrolledOffset)
+	}
+
+	m.setDark(false)
+	if got := m.viewport.YOffset(); got != scrolledOffset {
+		t.Fatalf("theme change y offset = %d, want preserved offset %d", got, scrolledOffset)
+	}
+
+	m = updateModel(t, m, MessageReceived{Body: "new", Mine: true})
+	if !m.viewport.AtBottom() {
+		t.Fatalf("new message should follow to bottom; offset = %d", m.viewport.YOffset())
+	}
+}
+
 func TestCtrlCAndEscRequestQuit(t *testing.T) {
 	for _, msg := range []tea.KeyPressMsg{
 		keyCtrl("c"),
