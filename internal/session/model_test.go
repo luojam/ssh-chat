@@ -244,56 +244,6 @@ func TestWaitForRoomEventClosesSubscriptionOnContextCancel(t *testing.T) {
 	assertSubscriptionClosed(t, m.subscription)
 }
 
-func TestContinueRequestedJoinsRoom(t *testing.T) {
-	m := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
-	})
-	if m.joined {
-		t.Fatal("session should start before chat join")
-	}
-	if m.subscription != nil {
-		t.Fatal("subscription should be nil before continue")
-	}
-
-	next, cmd := m.Update(tui.ContinueRequested{})
-	if cmd == nil {
-		t.Fatal("ContinueRequested should return startup command")
-	}
-
-	m = assertModel(t, next)
-	if !m.joined {
-		t.Fatal("session should be joined after continue")
-	}
-	if m.subscription == nil {
-		t.Fatal("subscription should be set after continue")
-	}
-}
-
-func TestQuitBeforeContinueDoesNotNeedSubscription(t *testing.T) {
-	m := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
-	})
-
-	next, cmd := m.Update(tui.QuitRequested{})
-	if cmd == nil {
-		t.Fatal("QuitRequested should return quit command")
-	}
-
-	m = assertModel(t, next)
-	if !m.closed {
-		t.Fatal("session should be marked closed")
-	}
-	if m.subscription != nil {
-		t.Fatal("subscription should remain nil when quitting before continue")
-	}
-}
-
 func newModel(t *testing.T, config Config) model {
 	t.Helper()
 

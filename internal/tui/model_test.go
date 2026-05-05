@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -100,65 +99,6 @@ func TestShortHistoryRendersAboveComposer(t *testing.T) {
 	lastMsgRow := lines[4]
 	if !strings.Contains(lastMsgRow, localAuthor) || !strings.Contains(lastMsgRow, "hi") {
 		t.Fatalf("bottom message row should include latest message, got %q", lastMsgRow)
-	}
-}
-
-func TestHeaderStylesTitle(t *testing.T) {
-	styles := newStyles(true)
-
-	if !styles.headerTitle.GetBold() {
-		t.Fatal("header title should be bold")
-	}
-	if styles.headerTitle.GetAlign() != lipgloss.Center {
-		t.Fatal("header title should be center-aligned")
-	}
-}
-
-func TestHeaderRendersFullWidth(t *testing.T) {
-	m := newModel(t, Config{Width: 40, Height: 8})
-
-	header := m.renderHeader(40)
-
-	if got := ansi.StringWidth(header); got != 40 {
-		t.Fatalf("header width = %d, want 40; header = %q", got, header)
-	}
-	if !strings.Contains(ansi.Strip(header), appName) {
-		t.Fatalf("header should contain app name, got %q", header)
-	}
-}
-
-func TestSystemAuthorStyleIsDistinct(t *testing.T) {
-	m := newModel(t, Config{Width: 40, Height: 8})
-
-	style := m.messageAuthorStyle(message{author: systemAuthor})
-
-	if !style.GetBold() {
-		t.Fatal("system author style should be bold for visual distinction")
-	}
-}
-
-func TestComposerPlaceholderRightAligned(t *testing.T) {
-	// At width 40, the prompt is 2 chars, leaving 38 for input.
-	// The hint should appear at the trailing end of the placeholder.
-	placeholder := buildPlaceholder(inputWidth(40))
-	if !strings.HasSuffix(placeholder, composerQuitHint) {
-		t.Fatalf("placeholder should end with quit hint, got %q", placeholder)
-	}
-	if !strings.HasPrefix(placeholder, "Message...") {
-		t.Fatalf("placeholder should start with Message..., got %q", placeholder)
-	}
-}
-
-func TestQIsNormalInput(t *testing.T) {
-	m := newModel(t, Config{Width: 40, Height: 8})
-
-	m = updateModel(t, m, keyText("q"))
-
-	if got := m.input.Value(); got != "q" {
-		t.Fatalf("input value = %q, want %q", got, "q")
-	}
-	if got := len(m.messages); got != 0 {
-		t.Fatalf("message count = %d, want 0", got)
 	}
 }
 

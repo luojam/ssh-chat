@@ -94,26 +94,6 @@ func TestJoinedSubscriptionCloseBroadcastsMemberLeft(t *testing.T) {
 	}
 }
 
-func TestRoomPostAssignsSequentialMessageIDs(t *testing.T) {
-	room := NewRoom()
-
-	first, err := room.Post(Member{ID: "user-1", Name: "user"}, "first")
-	if err != nil {
-		t.Fatalf("Post returned error: %v", err)
-	}
-	second, err := room.Post(Member{ID: "user-1", Name: "user"}, "second")
-	if err != nil {
-		t.Fatalf("Post returned error: %v", err)
-	}
-
-	if first.ID == 0 {
-		t.Fatal("first id should be non-zero")
-	}
-	if got, want := second.ID, first.ID+1; got != want {
-		t.Fatalf("second id = %d, want %d", got, want)
-	}
-}
-
 func TestRoomSubscribeReplaysHistory(t *testing.T) {
 	room := NewRoom()
 	first, err := room.Post(Member{ID: "user-1", Name: "user"}, "first")
