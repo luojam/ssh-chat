@@ -31,11 +31,12 @@ func New(config Config) tea.Model {
 	}
 
 	return model{
-		ctx:          ctx,
-		room:         config.Room,
-		member:       config.Member,
-		subscription: config.Room.Join(config.Member),
-		ui: tui.New(tui.Config{
+		ctx:    ctx,
+		room:   config.Room,
+		member: config.Member,
+		width:  config.Width,
+		height: config.Height,
+		ui: tui.NewWelcome(tui.Config{
 			Width:  config.Width,
 			Height: config.Height,
 		}),
@@ -46,7 +47,10 @@ type model struct {
 	ctx          context.Context
 	room         *chat.Room
 	member       chat.Member // local participant; pairs with Config.Member at construction
+	width        int
+	height       int
 	subscription *chat.Subscription
+	joined       bool
 	closed       bool
 	ui           tea.Model
 }
@@ -61,9 +65,14 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 	case tui.QuitRequested:
 		m.close()
 		return m, tea.Quit
+	case tui.ContinueRequested:
+		return m, m.startChat()
 	case tui.SendRequested:
 		return m, m.postMessage(msg.Body)
 	case roomEvent:
@@ -87,7 +96,7 @@ func (m model) View() tea.View {
 
 func (m model) postMessage(body string) tea.Cmd {
 	return func() tea.Msg {
-		if m.closed {
+		if m.closed || !m.joined {
 			return nil
 		}
 		_, _ = m.room.Post(m.member, body)
@@ -97,6 +106,10 @@ func (m model) postMessage(body string) tea.Cmd {
 
 func (m model) waitForRoomEvent() tea.Cmd {
 	return func() tea.Msg {
+		if m.subscription == nil {
+			return nil
+		}
+
 		select {
 		case <-m.ctx.Done():
 			m.subscription.Close()
@@ -115,6 +128,21 @@ func (m model) waitForRoomEvent() tea.Cmd {
 			return roomEvent{event: event}
 		}
 	}
+}
+
+func (m *model) startChat() tea.Cmd {
+	if m.closed || m.joined {
+		return nil
+	}
+
+	m.ui = tui.New(tui.Config{
+		Width:  m.width,
+		Height: m.height,
+	})
+	m.subscription = m.room.Join(m.member)
+	m.joined = true
+
+	return tea.Batch(m.ui.Init(), m.waitForRoomEvent())
 }
 
 func (m model) displayMessage(event chat.Event) (tui.MessageReceived, bool) {
@@ -145,5 +173,7 @@ func (m *model) close() {
 		return
 	}
 	m.closed = true
-	m.subscription.Close()
+	if m.subscription != nil {
+		m.subscription.Close()
+	}
 }

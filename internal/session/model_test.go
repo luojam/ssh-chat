@@ -18,6 +18,7 @@ func TestSendRequestedPostsToRoomAndRoomEventUpdatesTUI(t *testing.T) {
 		Room:   chat.NewRoom(),
 		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
+	m = enterChat(t, m)
 
 	next, cmd := m.Update(tui.SendRequested{Body: "hello"})
 	if cmd == nil {
@@ -45,6 +46,7 @@ func TestRoomEventMarksOtherMemberMessageAsNotMine(t *testing.T) {
 		Room:   chat.NewRoom(),
 		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
+	m = enterChat(t, m)
 
 	next, _ := m.Update(roomEvent{
 		event: chat.Event{
@@ -73,6 +75,7 @@ func TestRoomEventUsesMemberIDForMine(t *testing.T) {
 		Room:   chat.NewRoom(),
 		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
+	m = enterChat(t, m)
 
 	next, _ := m.Update(roomEvent{
 		event: chat.Event{
@@ -102,12 +105,14 @@ func TestRoomBroadcastReachesMultipleSessions(t *testing.T) {
 		Room:   room,
 		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
+	user = enterChat(t, user)
 	sara := newModel(t, Config{
 		Width:  40,
 		Height: 8,
 		Room:   room,
 		Member: chat.Member{ID: "sara-1", Name: "sara"},
 	})
+	sara = enterChat(t, sara)
 
 	_, cmd := user.Update(tui.SendRequested{Body: "hello"})
 	if cmd == nil {
@@ -151,6 +156,7 @@ func TestNewSessionCanRenderRoomHistory(t *testing.T) {
 		Room:   room,
 		Member: chat.Member{ID: "sara-1", Name: "sara"},
 	})
+	sara = enterChat(t, sara)
 
 	event := <-sara.subscription.Events()
 	next, _ := sara.Update(roomEvent{event: event})
@@ -169,6 +175,7 @@ func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
 		Room:   chat.NewRoom(),
 		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
+	m = enterChat(t, m)
 
 	event := nextRoomEvent(t, m.subscription, chat.MemberJoined)
 	next, _ := m.Update(roomEvent{event: event})
@@ -200,6 +207,7 @@ func TestQuitRequestedClosesSubscriptionBeforeQuit(t *testing.T) {
 		Room:   chat.NewRoom(),
 		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
+	m = enterChat(t, m)
 
 	next, cmd := m.Update(tui.QuitRequested{})
 	if cmd == nil {
@@ -227,12 +235,63 @@ func TestWaitForRoomEventClosesSubscriptionOnContextCancel(t *testing.T) {
 		Room:    chat.NewRoom(),
 		Member:  chat.Member{ID: "user-1", Name: "user"},
 	})
+	m = enterChat(t, m)
 
 	cancel()
 	if msg := m.waitForRoomEvent()(); msg != nil {
 		t.Fatalf("wait command returned %T, want nil", msg)
 	}
 	assertSubscriptionClosed(t, m.subscription)
+}
+
+func TestContinueRequestedJoinsRoom(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	if m.joined {
+		t.Fatal("session should start before chat join")
+	}
+	if m.subscription != nil {
+		t.Fatal("subscription should be nil before continue")
+	}
+
+	next, cmd := m.Update(tui.ContinueRequested{})
+	if cmd == nil {
+		t.Fatal("ContinueRequested should return startup command")
+	}
+
+	m = assertModel(t, next)
+	if !m.joined {
+		t.Fatal("session should be joined after continue")
+	}
+	if m.subscription == nil {
+		t.Fatal("subscription should be set after continue")
+	}
+}
+
+func TestQuitBeforeContinueDoesNotNeedSubscription(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+
+	next, cmd := m.Update(tui.QuitRequested{})
+	if cmd == nil {
+		t.Fatal("QuitRequested should return quit command")
+	}
+
+	m = assertModel(t, next)
+	if !m.closed {
+		t.Fatal("session should be marked closed")
+	}
+	if m.subscription != nil {
+		t.Fatal("subscription should remain nil when quitting before continue")
+	}
 }
 
 func newModel(t *testing.T, config Config) model {
@@ -286,4 +345,23 @@ func assertSubscriptionClosed(t *testing.T, subscription *chat.Subscription) {
 			t.Fatal("subscription events should be closed")
 		}
 	}
+}
+
+func enterChat(t *testing.T, m model) model {
+	t.Helper()
+
+	next, cmd := m.Update(tui.ContinueRequested{})
+	if cmd == nil {
+		t.Fatal("continue should return startup command")
+	}
+
+	m = assertModel(t, next)
+	if !m.joined {
+		t.Fatal("model should be joined after continue")
+	}
+	if m.subscription == nil {
+		t.Fatal("model should set subscription after continue")
+	}
+
+	return m
 }

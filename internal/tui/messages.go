@@ -33,6 +33,9 @@ type SendRequested struct {
 // it asks Bubble Tea to stop the program.
 type QuitRequested struct{}
 
+// ContinueRequested triggered on enter in welcome screen
+type ContinueRequested struct{}
+
 // MessageReceived is display data for the terminal. Backend message IDs,
 // delivery rules, and storage details stay outside the TUI.
 type MessageReceived struct {
@@ -63,6 +66,10 @@ func (m *model) requestSend() tea.Cmd {
 
 func requestQuit() tea.Msg {
 	return QuitRequested{}
+}
+
+func requestContinue() tea.Msg {
+	return ContinueRequested{}
 }
 
 func (m *model) receiveMessage(msg MessageReceived) {
