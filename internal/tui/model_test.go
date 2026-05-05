@@ -28,13 +28,16 @@ func TestInitialLayoutUsesFullFrame(t *testing.T) {
 	if strings.Contains(lines[0], "connected") || strings.Contains(lines[0], composerQuitHint) {
 		t.Fatalf("header should be title only, got %q", lines[0])
 	}
+	if !strings.Contains(lines[1], string(inputSepRune)) {
+		t.Fatalf("header divider row should be a separator, got %q", lines[1])
+	}
 	if !strings.Contains(lines[6], composerQuitHint) {
 		t.Fatalf("composer placeholder should include quit hint, got %q", lines[6])
 	}
-	if strings.Contains(lines[1], emptyStateText) {
-		t.Fatalf("empty state should not start at top of message area, got %q", lines[1])
+	if strings.Contains(lines[2], emptyStateText) {
+		t.Fatalf("empty state should not start at top of message area, got %q", lines[2])
 	}
-	// With an input frame (height ≥ 5): messages, top rule, composer, bottom rule.
+	// With an input frame (height ≥ 6): messages, top rule, composer, bottom rule.
 	lastMsgRow := 4
 	if !strings.Contains(lines[lastMsgRow], emptyStateText) {
 		t.Fatalf("last message row should include empty state, got %q", lines[lastMsgRow])
@@ -91,8 +94,8 @@ func TestShortHistoryRendersAboveComposer(t *testing.T) {
 	m = updateModel(t, m, MessageReceived{Body: "hi", Mine: true})
 
 	lines := strings.Split(m.View().Content, "\n")
-	if strings.Contains(lines[1], localAuthor) || strings.Contains(lines[1], "hi") {
-		t.Fatalf("message should not start at top of message area, got %q", lines[1])
+	if strings.Contains(lines[2], localAuthor) || strings.Contains(lines[2], "hi") {
+		t.Fatalf("message should not start at top of message area, got %q", lines[2])
 	}
 	lastMsgRow := lines[4]
 	if !strings.Contains(lastMsgRow, localAuthor) || !strings.Contains(lastMsgRow, "hi") {
@@ -121,6 +124,16 @@ func TestHeaderRendersFullWidth(t *testing.T) {
 	}
 	if !strings.Contains(ansi.Strip(header), appName) {
 		t.Fatalf("header should contain app name, got %q", header)
+	}
+}
+
+func TestSystemAuthorStyleIsDistinct(t *testing.T) {
+	m := newModel(t, Config{Width: 40, Height: 8})
+
+	style := m.messageAuthorStyle(message{author: systemAuthor})
+
+	if !style.GetBold() {
+		t.Fatal("system author style should be bold for visual distinction")
 	}
 }
 

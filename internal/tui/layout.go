@@ -33,9 +33,9 @@ func inputWidth(width int) int {
 }
 
 // inputFrameVisible returns true if horizontal input separators are shown—i.e.,
-// header, separators, and at least one message row fit; else, show simple footer.
+// header, header divider, separators, and at least one message row fit.
 func inputFrameVisible(frameHeight int) bool {
-	return frameHeight >= 5
+	return frameHeight >= 6
 }
 
 func messageAreaHeight(frameHeight int) int {
@@ -49,7 +49,7 @@ func messageAreaHeight(frameHeight int) int {
 		if inputFrameVisible(frameHeight) {
 			footerRows = 3 // separator + composer + separator
 		}
-		// One row for the header.
-		return max(1, frameHeight-1-footerRows)
+		// Two rows for title and divider.
+		return max(1, frameHeight-2-footerRows)
 	}
 }

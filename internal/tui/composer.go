@@ -11,7 +11,7 @@ import (
 
 const (
 	composerPrompt   = "> "
-	composerQuitHint = "esc/ctrl+c to quit"
+	composerQuitHint = "Esc to quit"
 )
 
 // "Message..." anchors the left; spaces push the hint close to the right end.

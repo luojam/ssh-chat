@@ -122,6 +122,7 @@ func (m model) render() string {
 		return lipgloss.JoinVertical(
 			lipgloss.Left,
 			m.renderHeader(frame.width),
+			m.renderHeaderDivider(frame.width),
 			m.renderMessages(),
 			m.renderComposerSection(frame.width, frame.height),
 		)

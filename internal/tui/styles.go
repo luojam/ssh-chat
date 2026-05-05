@@ -7,8 +7,10 @@ import (
 
 const (
 	headerTitleColor     = "15"
+	headerDividerColor   = "240"
 	emptyMessageColor    = "8"
 	authorColor          = "12"
+	systemAuthorColor    = "11"
 	darkMineAuthorColor  = "10"
 	lightMineAuthorColor = "2"
 	darkBodyColor        = "15"
@@ -25,8 +27,10 @@ const (
 
 type styles struct {
 	headerTitle      lipgloss.Style
+	headerDivider    lipgloss.Style
 	empty            lipgloss.Style
 	author           lipgloss.Style
+	systemAuthor     lipgloss.Style
 	mineAuthor       lipgloss.Style
 	body             lipgloss.Style
 	composer         lipgloss.Style
@@ -40,8 +44,10 @@ type styles struct {
 func newStyles(isDark bool) styles {
 	s := styles{
 		headerTitle:      lipgloss.NewStyle().Foreground(lipgloss.Color(headerTitleColor)).Bold(true).Align(lipgloss.Center),
+		headerDivider:    lipgloss.NewStyle().Foreground(lipgloss.Color(headerDividerColor)).Faint(true),
 		empty:            lipgloss.NewStyle().Foreground(lipgloss.Color(emptyMessageColor)),
 		author:           lipgloss.NewStyle().Foreground(lipgloss.Color(authorColor)),
+		systemAuthor:     lipgloss.NewStyle().Foreground(lipgloss.Color(systemAuthorColor)).Bold(true),
 		composer:         lipgloss.NewStyle(),
 		inputSep:         lipgloss.NewStyle().Foreground(lipgloss.Color(composerSepColor)).Faint(true),
 		welcomeBox:       lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2).Align(lipgloss.Center),

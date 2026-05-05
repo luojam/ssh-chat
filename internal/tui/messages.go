@@ -14,6 +14,7 @@ const (
 	authorColumnWidth = 8
 	emptyStateText    = "No messages yet."
 	localAuthor       = "you"
+	systemAuthor      = "system"
 	unknownAuthor     = "unknown"
 )
 
@@ -147,6 +148,9 @@ func (m model) renderMessage(msg message, width int) []string {
 func (m model) messageAuthorStyle(msg message) lipgloss.Style {
 	if msg.mine {
 		return m.styles.mineAuthor
+	}
+	if msg.displayAuthor() == systemAuthor {
+		return m.styles.systemAuthor
 	}
 	return m.styles.author
 }
