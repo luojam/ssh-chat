@@ -6,7 +6,6 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 )
 
 const (
@@ -34,8 +33,7 @@ func newComposer(isDark bool) (textinput.Model, tea.Cmd) {
 }
 
 func (m model) renderComposer(width int) string {
-	line := ansi.Truncate(m.input.View(), width, "")
-	return m.styles.composer.Width(width).MaxWidth(width).Inline(true).Render(line)
+	return renderFullWidth(m.styles.composer.Inline(true), width, m.input.View())
 }
 
 // renderComposerSection draws optional separator lines above and below the input row.
@@ -53,5 +51,5 @@ func (m model) renderComposerSection(width int, showFrame bool) string {
 
 func (m model) renderInputSeparator(width int) string {
 	line := strings.Repeat(string(inputSepRune), max(1, width))
-	return m.styles.inputSep.Width(width).MaxWidth(width).Render(line)
+	return renderFullWidth(m.styles.inputSep, width, line)
 }

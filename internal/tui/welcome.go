@@ -99,9 +99,9 @@ func (m welcomeModel) renderWelcomeBox(width int) string {
 		m.styles.welcomeSecondary.Render(wrapCenter(welcomeQuitLine, contentW)),
 	}
 	body := strings.Join(lines, "\n")
+
 	return m.styles.welcomeBox.
 		Width(width).
-		MaxWidth(width).
 		Render(body)
 }
 

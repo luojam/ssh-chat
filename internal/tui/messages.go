@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
@@ -165,11 +164,4 @@ func (msg message) displayAuthor() string {
 		return unknownAuthor
 	}
 	return msg.author
-}
-
-func fixedCell(s string, width int) string {
-	if lipgloss.Width(s) > width {
-		return ansi.Truncate(s, width, "")
-	}
-	return fmt.Sprintf("%-*s", width, s)
 }
