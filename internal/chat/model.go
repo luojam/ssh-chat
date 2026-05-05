@@ -12,8 +12,12 @@ var ErrEmptyMessage = errors.New("empty message")
 const subscriptionBuffer = 16
 const historyLimit = subscriptionBuffer
 
+// MemberID is an opaque room participant identifier. The SSH server assigns a
+// new ID per connection; it is not a durable user account ID unless you add that layer.
 type MemberID string
 
+// Member is the chat package's name for "someone in the room": messages and join/leave
+// events reference it. Session code chooses which Member value applies to each SSH client.
 type Member struct {
 	ID   MemberID
 	Name string
@@ -74,14 +78,22 @@ func NewRoom() *Room {
 	}
 }
 
+// Subscribe returns a stream of room events (including a replay of recent message
+// history) but does not register a member. No MemberJoined or MemberLeft events
+// are emitted for this subscription.
 func (r *Room) Subscribe() *Subscription {
 	return r.subscribe(Member{}, false)
 }
 
+// Join is like Subscribe, but associates the subscription with member and announces
+// their presence: other subscribers receive MemberJoined, and MemberLeft when Close runs.
 func (r *Room) Join(member Member) *Subscription {
 	return r.subscribe(member, true)
 }
 
+// subscribe is the shared implementation for Subscribe and Join. The joined flag
+// controls whether this subscription participates in member join/leave broadcasts;
+// member is the identity stored for those events when joined is true.
 func (r *Room) subscribe(member Member, joined bool) *Subscription {
 	events := make(chan Event, subscriptionBuffer)
 
@@ -164,14 +176,14 @@ func (r *Room) history() []Message {
 }
 
 func (r *Room) broadcast(event Event) {
-	for events := range r.subscribers {
+	for sub := range r.subscribers {
 		select {
-		case events <- event:
+		case sub <- event:
 		default:
 			// A full subscriber is not keeping up with room traffic. Closing it
 			// keeps one slow SSH session from blocking every other participant.
-			delete(r.subscribers, events)
-			close(events)
+			delete(r.subscribers, sub)
+			close(sub)
 		}
 	}
 }

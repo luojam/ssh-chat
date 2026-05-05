@@ -9,7 +9,7 @@ type frameSize struct {
 
 func (m model) frame() frameSize {
 	return frameSize{
-		width:  m.frameWidth(),
+		width:  safeDimension(m.width),
 		height: safeDimension(m.height),
 	}
 }

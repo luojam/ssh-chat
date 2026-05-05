@@ -98,6 +98,8 @@ func teaHandler(sess ssh.Session, room *chat.Room) (tea.Model, []tea.ProgramOpti
 		Height:  pty.Window.Height,
 		Context: sess.Context(),
 		Room:    room,
+		// Room participant for this connection: new opaque ID each SSH session; display
+		// name from SSH login (see memberName). chat.Member is the shared shape only.
 		Member: chat.Member{
 			ID:   id,
 			Name: memberName(sess),

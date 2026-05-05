@@ -4,6 +4,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 const (
@@ -48,6 +49,12 @@ type model struct {
 
 func (m model) Init() tea.Cmd {
 	return tea.Batch(tea.RequestBackgroundColor, m.initialCmd)
+}
+
+func (m model) View() tea.View {
+	v := tea.NewView(m.render())
+	v.AltScreen = true
+	return v
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -97,4 +104,26 @@ func (m *model) resize(width, height int) {
 
 	m.input.SetWidth(inputWidth(m.frameWidth()))
 	m.syncMessageViewport()
+}
+
+func (m model) render() string {
+	frame := m.frame()
+
+	switch frame.height {
+	case 1:
+		return m.renderComposer(frame.width)
+	case 2:
+		return lipgloss.JoinVertical(
+			lipgloss.Left,
+			m.renderMessages(),
+			m.renderComposer(frame.width),
+		)
+	default:
+		return lipgloss.JoinVertical(
+			lipgloss.Left,
+			m.renderHeader(frame.width),
+			m.renderMessages(),
+			m.renderComposer(frame.width),
+		)
+	}
 }

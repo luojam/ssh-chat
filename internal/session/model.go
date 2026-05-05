@@ -11,12 +11,17 @@ import (
 
 const systemAuthor = "system"
 
+// Config wires one Bubble Tea session to the shared room. Member is this SSH client's
+// identity in the room (same type chat uses for authors and join/leave); the transport
+// layer constructs it and passes it in—chat does not infer "current user" by itself.
 type Config struct {
 	Width   int
 	Height  int
 	Context context.Context
 	Room    *chat.Room
-	Member  chat.Member
+	// Member is who this session joins and posts as; kept on the model to attribute
+	// outgoing messages and to mark incoming lines as Mine vs others.
+	Member chat.Member
 }
 
 func New(config Config) tea.Model {
@@ -40,7 +45,7 @@ func New(config Config) tea.Model {
 type model struct {
 	ctx          context.Context
 	room         *chat.Room
-	member       chat.Member
+	member       chat.Member // local participant; pairs with Config.Member at construction
 	subscription *chat.Subscription
 	closed       bool
 	ui           tea.Model
