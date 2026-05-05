@@ -79,14 +79,13 @@ func (m *welcomeModel) resize(width, height int) {
 }
 
 func (m welcomeModel) render() string {
-	frameW := safeDimension(m.width)
-	frameH := safeDimension(m.height)
-	boxW := min(frameW, welcomeTargetBoxWidth)
+	frame := safeFrameSize(m.width, m.height)
+	boxW := min(frame.width, welcomeTargetBoxWidth)
 
 	box := m.renderWelcomeBox(boxW)
 	return lipgloss.NewStyle().
-		Width(frameW).
-		Height(frameH).
+		Width(frame.width).
+		Height(frame.height).
 		Align(lipgloss.Center, lipgloss.Center).
 		Render(box)
 }

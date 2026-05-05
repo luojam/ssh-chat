@@ -8,9 +8,13 @@ type frameSize struct {
 }
 
 func (m model) frame() frameSize {
+	return safeFrameSize(m.width, m.height)
+}
+
+func safeFrameSize(width, height int) frameSize {
 	return frameSize{
-		width:  safeDimension(m.width),
-		height: safeDimension(m.height),
+		width:  safeDimension(width),
+		height: safeDimension(height),
 	}
 }
 
