@@ -144,6 +144,19 @@ func TestViewportSyncPreservesScrollOnResizeAndThemeChange(t *testing.T) {
 	}
 }
 
+func TestCtrlLRequestsLeaveChat(t *testing.T) {
+	m := newModel(t, Config{Width: 40, Height: 8})
+
+	_, cmd := m.Update(keyCtrl("l"))
+	if cmd == nil {
+		t.Fatal("ctrl+l should request leaving chat")
+	}
+	msg := cmd()
+	if _, ok := msg.(LeaveRequested); !ok {
+		t.Fatalf("ctrl+l command returned %T, want LeaveRequested", msg)
+	}
+}
+
 func TestCtrlCAndEscRequestQuit(t *testing.T) {
 	for _, msg := range []tea.KeyPressMsg{
 		keyCtrl("c"),

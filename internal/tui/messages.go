@@ -37,6 +37,10 @@ type QuitRequested struct{}
 // enter the chat view.
 type ContinueRequested struct{}
 
+// LeaveRequested is emitted by the chat view when the user chooses to leave the
+// room without quitting the SSH session.
+type LeaveRequested struct{}
+
 // MessageReceived is display data for the terminal. Backend message IDs,
 // delivery rules, and storage details stay outside the TUI.
 type MessageReceived struct {
@@ -71,6 +75,10 @@ func requestQuit() tea.Msg {
 
 func requestContinue() tea.Msg {
 	return ContinueRequested{}
+}
+
+func requestLeave() tea.Msg {
+	return LeaveRequested{}
 }
 
 func (m *model) receiveMessage(msg MessageReceived) {

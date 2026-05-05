@@ -11,6 +11,13 @@ import (
 
 const systemAuthor = "system"
 
+type viewState int
+
+const (
+	viewWelcome viewState = iota
+	viewChat
+)
+
 // Config wires one Bubble Tea session to the shared room. Member is this SSH client's
 // identity in the room (same type chat uses for authors and join/leave); the transport
 // layer constructs it and passes it in—chat does not infer "current user" by itself.
@@ -36,6 +43,7 @@ func New(config Config) tea.Model {
 		member: config.Member,
 		width:  config.Width,
 		height: config.Height,
+		view:   viewWelcome,
 		ui: tui.NewWelcome(tui.Config{
 			Width:  config.Width,
 			Height: config.Height,
@@ -50,6 +58,7 @@ type model struct {
 	width        int
 	height       int
 	subscription *chat.Subscription
+	view         viewState
 	joined       bool
 	closed       bool
 	ui           tea.Model
@@ -76,9 +85,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case tui.ContinueRequested:
 		return m, m.startChat()
+	case tui.LeaveRequested:
+		return m, m.leaveChat()
 	case tui.SendRequested:
 		return m, m.postMessage(msg.Body)
 	case roomEvent:
+		if m.view != viewChat {
+			return m, nil
+		}
 		display, ok := m.displayMessage(msg.event)
 		if !ok {
 			return m, m.waitForRoomEvent()
@@ -143,9 +157,31 @@ func (m *model) startChat() tea.Cmd {
 		Height: m.height,
 	})
 	m.subscription = m.room.Join(m.member)
+	m.view = viewChat
 	m.joined = true
 
 	return tea.Batch(m.ui.Init(), m.waitForRoomEvent())
+}
+
+// leaveChat is navigation plus membership cleanup. Keeping both together makes
+// the invariant explicit: the welcome view never has an active room subscription.
+func (m *model) leaveChat() tea.Cmd {
+	if m.closed || !m.joined {
+		return nil
+	}
+
+	if m.subscription != nil {
+		m.subscription.Close()
+		m.subscription = nil
+	}
+	m.joined = false
+	m.view = viewWelcome
+	m.ui = tui.NewWelcome(tui.Config{
+		Width:  m.width,
+		Height: m.height,
+	})
+
+	return m.ui.Init()
 }
 
 func (m model) displayMessage(event chat.Event) (tui.MessageReceived, bool) {

@@ -200,6 +200,80 @@ func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
 	}
 }
 
+func TestLeaveRequestedReturnsToWelcomeAndClosesSubscription(t *testing.T) {
+	room := chat.NewRoom()
+	user := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   room,
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	user = enterChat(t, user)
+	oldSubscription := user.subscription
+
+	sara := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   room,
+		Member: chat.Member{ID: "sara-1", Name: "sara"},
+	})
+	sara = enterChat(t, sara)
+
+	next, cmd := user.Update(tui.LeaveRequested{})
+	if cmd == nil {
+		t.Fatal("LeaveRequested should initialize the welcome view")
+	}
+	user = assertModel(t, next)
+
+	if user.view != viewWelcome {
+		t.Fatalf("view = %d, want viewWelcome", user.view)
+	}
+	if user.joined {
+		t.Fatal("user should no longer be joined after leaving chat")
+	}
+	if user.subscription != nil {
+		t.Fatal("subscription should be cleared after leaving chat")
+	}
+	assertSubscriptionClosed(t, oldSubscription)
+
+	view := user.View()
+	if !strings.Contains(view.Content, "Welcome!") {
+		t.Fatalf("leaving chat should return to welcome view, got %q", view.Content)
+	}
+
+	left := nextRoomEvent(t, sara.subscription, chat.MemberLeft)
+	if got := left.Member.Name; got != "user" {
+		t.Fatalf("left member = %q, want user", got)
+	}
+}
+
+func TestStaleRoomEventIgnoredAfterLeavingChat(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterChat(t, m)
+	next, _ := m.Update(tui.LeaveRequested{})
+	m = assertModel(t, next)
+
+	next, cmd := m.Update(roomEvent{event: chat.Event{
+		Kind: chat.MessagePosted,
+		Message: chat.Message{
+			Author: chat.Member{ID: "sara-1", Name: "sara"},
+			Body:   "stale",
+		},
+	}})
+	m = assertModel(t, next)
+	if cmd != nil {
+		t.Fatal("stale room event after leaving should not continue room wait loop")
+	}
+	if strings.Contains(m.View().Content, "stale") {
+		t.Fatalf("stale room event should not update welcome view, got %q", m.View().Content)
+	}
+}
+
 func TestQuitRequestedClosesSubscriptionBeforeQuit(t *testing.T) {
 	m := newModel(t, Config{
 		Width:  40,

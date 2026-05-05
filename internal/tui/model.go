@@ -11,6 +11,7 @@ const (
 	keyQuitCtrlC = "ctrl+c"
 	keyQuitEsc   = "esc"
 	keySend      = "enter"
+	keyLeaveChat = "ctrl+l"
 )
 
 type Config struct {
@@ -80,6 +81,8 @@ func (m *model) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	switch msg.String() {
 	case keyQuitCtrlC, keyQuitEsc:
 		return true, requestQuit
+	case keyLeaveChat:
+		return true, requestLeave
 	case keySend:
 		return true, m.requestSend()
 	default:
