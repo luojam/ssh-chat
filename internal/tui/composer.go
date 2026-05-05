@@ -12,6 +12,7 @@ import (
 const (
 	composerPrompt   = "> "
 	composerQuitHint = "Esc to quit"
+	inputSepRune     = '─'
 )
 
 // "Message..." anchors the left; spaces push the hint close to the right end.
@@ -33,12 +34,7 @@ func newComposer(isDark bool) (textinput.Model, tea.Cmd) {
 }
 
 func (m model) renderComposer(width int) string {
-	input := m.input
-	inputW := inputWidth(width)
-	// Rebuild the placeholder each render so it always matches the current width.
-	input.Placeholder = buildPlaceholder(inputW)
-	input.SetWidth(inputW)
-	line := ansi.Truncate(input.View(), width, "")
+	line := ansi.Truncate(m.input.View(), width, "")
 	return m.styles.composer.Width(width).MaxWidth(width).Inline(true).Render(line)
 }
 
@@ -54,8 +50,6 @@ func (m model) renderComposerSection(width, frameHeight int) string {
 		m.renderInputSeparator(width),
 	)
 }
-
-const inputSepRune = '─'
 
 func (m model) renderInputSeparator(width int) string {
 	line := strings.Repeat(string(inputSepRune), max(1, width))

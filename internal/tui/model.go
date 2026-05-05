@@ -102,8 +102,14 @@ func (m *model) resize(width, height int) {
 	m.width = width
 	m.height = height
 
-	m.input.SetWidth(inputWidth(m.frameWidth()))
+	m.syncComposer()
 	m.syncMessageViewport()
+}
+
+func (m *model) syncComposer() {
+	width := inputWidth(m.frameWidth())
+	m.input.SetWidth(width)
+	m.input.Placeholder = buildPlaceholder(width)
 }
 
 func (m model) render() string {
