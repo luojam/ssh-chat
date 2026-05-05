@@ -200,7 +200,31 @@ func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
 	}
 }
 
-func TestLeaveRequestedReturnsToWelcomeAndClosesSubscription(t *testing.T) {
+func TestWelcomeContinueShowsDashboard(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+
+	next, cmd := m.Update(tui.ContinueRequested{})
+	if cmd == nil {
+		t.Fatal("ContinueRequested from welcome should initialize dashboard")
+	}
+	m = assertModel(t, next)
+	if m.view != viewDashboard {
+		t.Fatalf("view = %d, want viewDashboard", m.view)
+	}
+	if m.joined || m.subscription != nil {
+		t.Fatal("dashboard should not join the room")
+	}
+	if !strings.Contains(m.View().Content, "Dashboard") {
+		t.Fatalf("continue from welcome should render dashboard, got %q", m.View().Content)
+	}
+}
+
+func TestLeaveRequestedReturnsToDashboardAndClosesSubscription(t *testing.T) {
 	room := chat.NewRoom()
 	user := newModel(t, Config{
 		Width:  40,
@@ -221,12 +245,12 @@ func TestLeaveRequestedReturnsToWelcomeAndClosesSubscription(t *testing.T) {
 
 	next, cmd := user.Update(tui.LeaveRequested{})
 	if cmd == nil {
-		t.Fatal("LeaveRequested should initialize the welcome view")
+		t.Fatal("LeaveRequested should initialize the dashboard view")
 	}
 	user = assertModel(t, next)
 
-	if user.view != viewWelcome {
-		t.Fatalf("view = %d, want viewWelcome", user.view)
+	if user.view != viewDashboard {
+		t.Fatalf("view = %d, want viewDashboard", user.view)
 	}
 	if user.joined {
 		t.Fatal("user should no longer be joined after leaving chat")
@@ -237,8 +261,8 @@ func TestLeaveRequestedReturnsToWelcomeAndClosesSubscription(t *testing.T) {
 	assertSubscriptionClosed(t, oldSubscription)
 
 	view := user.View()
-	if !strings.Contains(view.Content, "Welcome!") {
-		t.Fatalf("leaving chat should return to welcome view, got %q", view.Content)
+	if !strings.Contains(view.Content, "Dashboard") {
+		t.Fatalf("leaving chat should return to dashboard view, got %q", view.Content)
 	}
 
 	left := nextRoomEvent(t, sara.subscription, chat.MemberLeft)
@@ -270,7 +294,7 @@ func TestStaleRoomEventIgnoredAfterLeavingChat(t *testing.T) {
 		t.Fatal("stale room event after leaving should not continue room wait loop")
 	}
 	if strings.Contains(m.View().Content, "stale") {
-		t.Fatalf("stale room event should not update welcome view, got %q", m.View().Content)
+		t.Fatalf("stale room event should not update dashboard view, got %q", m.View().Content)
 	}
 }
 
@@ -374,18 +398,37 @@ func assertSubscriptionClosed(t *testing.T, subscription *chat.Subscription) {
 func enterChat(t *testing.T, m model) model {
 	t.Helper()
 
+	m = enterDashboard(t, m)
 	next, cmd := m.Update(tui.ContinueRequested{})
 	if cmd == nil {
-		t.Fatal("continue should return startup command")
+		t.Fatal("continue from dashboard should return chat startup command")
 	}
 
 	m = assertModel(t, next)
+	if m.view != viewChat {
+		t.Fatalf("view = %d, want viewChat", m.view)
+	}
 	if !m.joined {
-		t.Fatal("model should be joined after continue")
+		t.Fatal("model should be joined after dashboard continue")
 	}
 	if m.subscription == nil {
-		t.Fatal("model should set subscription after continue")
+		t.Fatal("model should set subscription after dashboard continue")
 	}
 
+	return m
+}
+
+func enterDashboard(t *testing.T, m model) model {
+	t.Helper()
+
+	next, cmd := m.Update(tui.ContinueRequested{})
+	if cmd == nil {
+		t.Fatal("continue from welcome should return dashboard startup command")
+	}
+
+	m = assertModel(t, next)
+	if m.view != viewDashboard {
+		t.Fatalf("view = %d, want viewDashboard", m.view)
+	}
 	return m
 }

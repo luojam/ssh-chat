@@ -15,6 +15,7 @@ type viewState int
 
 const (
 	viewWelcome viewState = iota
+	viewDashboard
 	viewChat
 )
 
@@ -84,7 +85,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.close()
 		return m, tea.Quit
 	case tui.ContinueRequested:
-		return m, m.startChat()
+		return m, m.continueFromCurrentView()
 	case tui.LeaveRequested:
 		return m, m.leaveChat()
 	case tui.SendRequested:
@@ -147,6 +148,30 @@ func (m model) waitForRoomEvent() tea.Cmd {
 	}
 }
 
+func (m *model) continueFromCurrentView() tea.Cmd {
+	switch m.view {
+	case viewWelcome:
+		return m.showDashboard()
+	case viewDashboard:
+		return m.startChat()
+	default:
+		return nil
+	}
+}
+
+func (m *model) showDashboard() tea.Cmd {
+	if m.closed {
+		return nil
+	}
+
+	m.view = viewDashboard
+	m.ui = tui.NewDashboard(tui.Config{
+		Width:  m.width,
+		Height: m.height,
+	})
+	return m.ui.Init()
+}
+
 func (m *model) startChat() tea.Cmd {
 	if m.closed || m.joined {
 		return nil
@@ -164,7 +189,7 @@ func (m *model) startChat() tea.Cmd {
 }
 
 // leaveChat is navigation plus membership cleanup. Keeping both together makes
-// the invariant explicit: the welcome view never has an active room subscription.
+// the invariant explicit: the dashboard view never has an active room subscription.
 func (m *model) leaveChat() tea.Cmd {
 	if m.closed || !m.joined {
 		return nil
@@ -175,13 +200,7 @@ func (m *model) leaveChat() tea.Cmd {
 		m.subscription = nil
 	}
 	m.joined = false
-	m.view = viewWelcome
-	m.ui = tui.NewWelcome(tui.Config{
-		Width:  m.width,
-		Height: m.height,
-	})
-
-	return m.ui.Init()
+	return m.showDashboard()
 }
 
 func (m model) displayMessage(event chat.Event) (tui.MessageReceived, bool) {

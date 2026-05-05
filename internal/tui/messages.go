@@ -33,8 +33,8 @@ type SendRequested struct {
 // it asks Bubble Tea to stop the program.
 type QuitRequested struct{}
 
-// ContinueRequested is emitted by the welcome view when the user chooses to
-// enter the chat view.
+// ContinueRequested is emitted when a full-screen view asks the session to move
+// forward in the flow: welcome enters dashboard, dashboard enters chat.
 type ContinueRequested struct{}
 
 // LeaveRequested is emitted by the chat view when the user chooses to leave the
