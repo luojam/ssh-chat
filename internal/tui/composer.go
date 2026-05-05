@@ -10,21 +10,34 @@ import (
 )
 
 const (
-	composerPrompt      = "> "
-	composerPlaceholder = "Message..."
+	composerPrompt   = "> "
+	composerQuitHint = "esc/ctrl+c to quit"
 )
+
+// "Message..." anchors the left; spaces push the hint close to the right end.
+// Falls back to the base text alone when the box is too narrow to fit both.
+func buildPlaceholder(inputW int) string {
+	const base = "Message..."
+	gap := inputW - len(base) - len(composerQuitHint) - 1
+	if gap < 1 {
+		return base
+	}
+	return base + strings.Repeat(" ", gap) + composerQuitHint
+}
 
 func newComposer(isDark bool) (textinput.Model, tea.Cmd) {
 	input := textinput.New()
 	input.Prompt = composerPrompt
-	input.Placeholder = composerPlaceholder
 	input.SetStyles(inputStyles(isDark))
 	return input, input.Focus()
 }
 
 func (m model) renderComposer(width int) string {
 	input := m.input
-	input.SetWidth(inputWidth(width))
+	inputW := inputWidth(width)
+	// Rebuild the placeholder each render so it always matches the current width.
+	input.Placeholder = buildPlaceholder(inputW)
+	input.SetWidth(inputW)
 	line := ansi.Truncate(input.View(), width, "")
 	return m.styles.composer.Width(width).MaxWidth(width).Inline(true).Render(line)
 }

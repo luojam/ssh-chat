@@ -22,11 +22,14 @@ func TestInitialLayoutUsesFullFrame(t *testing.T) {
 			t.Fatalf("line %d width = %d, want 40; line = %q", i, got, line)
 		}
 	}
-	if !strings.Contains(lines[0], appName) || !strings.Contains(lines[0], statusConnected) {
-		t.Fatalf("header should include app name and status, got %q", lines[0])
+	if !strings.Contains(lines[0], appName) {
+		t.Fatalf("header should include app name, got %q", lines[0])
 	}
-	if !strings.Contains(lines[0], quitHint) {
-		t.Fatalf("header should include quit hint, got %q", lines[0])
+	if strings.Contains(lines[0], "connected") || strings.Contains(lines[0], composerQuitHint) {
+		t.Fatalf("header should be title only, got %q", lines[0])
+	}
+	if !strings.Contains(lines[6], composerQuitHint) {
+		t.Fatalf("composer placeholder should include quit hint, got %q", lines[6])
 	}
 	if strings.Contains(lines[1], emptyStateText) {
 		t.Fatalf("empty state should not start at top of message area, got %q", lines[1])
@@ -97,24 +100,18 @@ func TestShortHistoryRendersAboveComposer(t *testing.T) {
 	}
 }
 
-func TestHeaderStylesKeepQuitHintDim(t *testing.T) {
+func TestHeaderStylesTitle(t *testing.T) {
 	styles := newStyles(true)
 
-	if _, ok := styles.header.GetForeground().(lipgloss.NoColor); !ok {
-		t.Fatal("header bar should not set a foreground color that would override child text styles")
-	}
-	if _, ok := styles.header.GetBackground().(lipgloss.NoColor); ok {
-		t.Fatal("header bar should keep the colorful background")
-	}
 	if !styles.headerTitle.GetBold() {
-		t.Fatal("header title should keep the bold colorful treatment")
+		t.Fatal("header title should be bold")
 	}
-	if !styles.headerHint.GetFaint() {
-		t.Fatal("header quit hint should stay dim")
+	if styles.headerTitle.GetAlign() != lipgloss.Center {
+		t.Fatal("header title should be center-aligned")
 	}
 }
 
-func TestHeaderKeepsEdgePadding(t *testing.T) {
+func TestHeaderRendersFullWidth(t *testing.T) {
 	m := newModel(t, Config{Width: 40, Height: 8})
 
 	header := m.renderHeader(40)
@@ -122,18 +119,20 @@ func TestHeaderKeepsEdgePadding(t *testing.T) {
 	if got := ansi.StringWidth(header); got != 40 {
 		t.Fatalf("header width = %d, want 40; header = %q", got, header)
 	}
-	if !strings.HasPrefix(header, " ") {
-		t.Fatalf("header should start with unstyled edge padding, got %q", header)
+	if !strings.Contains(ansi.Strip(header), appName) {
+		t.Fatalf("header should contain app name, got %q", header)
 	}
-	if !strings.HasSuffix(header, " ") {
-		t.Fatalf("header should end with unstyled edge padding, got %q", header)
+}
+
+func TestComposerPlaceholderRightAligned(t *testing.T) {
+	// At width 40, the prompt is 2 chars, leaving 38 for input.
+	// The hint should appear at the trailing end of the placeholder.
+	placeholder := buildPlaceholder(inputWidth(40))
+	if !strings.HasSuffix(placeholder, composerQuitHint) {
+		t.Fatalf("placeholder should end with quit hint, got %q", placeholder)
 	}
-	stripped := ansi.Strip(header)
-	if !strings.HasPrefix(stripped, " "+appName) {
-		t.Fatalf("header should keep one left padding cell before title, got %q", stripped)
-	}
-	if !strings.HasSuffix(stripped, statusConnected+" ") {
-		t.Fatalf("header should keep one right padding cell after status, got %q", stripped)
+	if !strings.HasPrefix(placeholder, "Message...") {
+		t.Fatalf("placeholder should start with Message..., got %q", placeholder)
 	}
 }
 
