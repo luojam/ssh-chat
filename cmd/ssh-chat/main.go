@@ -26,7 +26,6 @@ const (
 	host          = "localhost"
 	port          = "2222"
 	hostKeyPath   = ".ssh/id_ed25519"
-	validPassword = "password"
 	defaultMember = "anonymous"
 )
 
@@ -36,13 +35,8 @@ func main() {
 	s, err := wish.NewServer(
 		wish.WithAddress(net.JoinHostPort(host, port)),
 		wish.WithHostKeyPath(hostKeyPath),
-
-		// Password auth only for dev simplicity.
-		// SSH in with:
-		//		ssh -o PreferredAuthentications=password -p 2222 localhost
-		wish.WithPasswordAuth(func(_ ssh.Context, password string) bool {
-			return password == validPassword
-		}),
+		// No client auth for local TUI development speed; connect with:
+		//		ssh -p 2222 localhost
 
 		// Wish builds the handler chain from first to last, so the last middleware
 		// listed here runs first for each SSH session. That gives logging the outer
