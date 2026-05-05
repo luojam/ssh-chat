@@ -31,11 +31,19 @@ func TestInitialLayoutUsesFullFrame(t *testing.T) {
 	if strings.Contains(lines[1], emptyStateText) {
 		t.Fatalf("empty state should not start at top of message area, got %q", lines[1])
 	}
-	if !strings.Contains(lines[len(lines)-2], emptyStateText) {
-		t.Fatalf("line above composer should include empty state, got %q", lines[len(lines)-2])
+	// With an input frame (height ≥ 5): messages, top rule, composer, bottom rule.
+	lastMsgRow := 4
+	if !strings.Contains(lines[lastMsgRow], emptyStateText) {
+		t.Fatalf("last message row should include empty state, got %q", lines[lastMsgRow])
 	}
-	if !strings.Contains(lines[len(lines)-1], composerPrompt) {
-		t.Fatalf("last line should include composer prompt, got %q", lines[len(lines)-1])
+	if !strings.Contains(lines[5], string(inputSepRune)) {
+		t.Fatalf("line above composer should be a separator, got %q", lines[5])
+	}
+	if !strings.Contains(lines[6], composerPrompt) {
+		t.Fatalf("composer row should include prompt, got %q", lines[6])
+	}
+	if !strings.Contains(lines[7], string(inputSepRune)) {
+		t.Fatalf("last line should be bottom separator, got %q", lines[7])
 	}
 }
 
@@ -83,9 +91,9 @@ func TestShortHistoryRendersAboveComposer(t *testing.T) {
 	if strings.Contains(lines[1], localAuthor) || strings.Contains(lines[1], "hi") {
 		t.Fatalf("message should not start at top of message area, got %q", lines[1])
 	}
-	lineAboveComposer := lines[len(lines)-2]
-	if !strings.Contains(lineAboveComposer, localAuthor) || !strings.Contains(lineAboveComposer, "hi") {
-		t.Fatalf("line above composer should include latest message, got %q", lineAboveComposer)
+	lastMsgRow := lines[4]
+	if !strings.Contains(lastMsgRow, localAuthor) || !strings.Contains(lastMsgRow, "hi") {
+		t.Fatalf("bottom message row should include latest message, got %q", lastMsgRow)
 	}
 }
 

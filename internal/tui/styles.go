@@ -17,6 +17,7 @@ const (
 	darkBodyColor         = "15"
 	composerAccentColor   = "10"
 	composerMutedColor    = "8"
+	composerSepColor      = "240"
 )
 
 type styles struct {
@@ -29,6 +30,7 @@ type styles struct {
 	mineAuthor   lipgloss.Style
 	body         lipgloss.Style
 	composer     lipgloss.Style
+	inputSep     lipgloss.Style
 }
 
 func newStyles(isDark bool) styles {
@@ -42,6 +44,7 @@ func newStyles(isDark bool) styles {
 		empty:        lipgloss.NewStyle().Foreground(lipgloss.Color(emptyMessageColor)),
 		author:       lipgloss.NewStyle().Foreground(lipgloss.Color(authorColor)),
 		composer:     lipgloss.NewStyle(),
+		inputSep:     lipgloss.NewStyle().Foreground(lipgloss.Color(composerSepColor)).Faint(true),
 	}
 
 	if isDark {

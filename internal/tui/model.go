@@ -123,7 +123,7 @@ func (m model) render() string {
 			lipgloss.Left,
 			m.renderHeader(frame.width),
 			m.renderMessages(),
-			m.renderComposer(frame.width),
+			m.renderComposerSection(frame.width, frame.height),
 		)
 	}
 }

@@ -32,6 +32,12 @@ func inputWidth(width int) int {
 	return max(1, width-lipgloss.Width(composerPrompt))
 }
 
+// inputFrameVisible returns true if horizontal input separators are shown—i.e.,
+// header, separators, and at least one message row fit; else, show simple footer.
+func inputFrameVisible(frameHeight int) bool {
+	return frameHeight >= 5
+}
+
 func messageAreaHeight(frameHeight int) int {
 	switch {
 	case frameHeight <= 1:
@@ -39,6 +45,11 @@ func messageAreaHeight(frameHeight int) int {
 	case frameHeight == 2:
 		return 1
 	default:
-		return max(1, frameHeight-2)
+		footerRows := 1
+		if inputFrameVisible(frameHeight) {
+			footerRows = 3 // separator + composer + separator
+		}
+		// One row for the header.
+		return max(1, frameHeight-1-footerRows)
 	}
 }
