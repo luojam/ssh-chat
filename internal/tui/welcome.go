@@ -13,7 +13,35 @@ const (
 	welcomeContinueLine   = "Press enter to continue..."
 	welcomeQuitLine       = "Esc to exit"
 	welcomeTargetBoxWidth = 40
+
+	welcomeLogoFullWidth    = 60
+	welcomeLogoStackedWidth = 33
 )
+
+var welcomeLogoFull = []string{
+	"███████╗███████╗██╗  ██╗    ██████╗██╗  ██╗ █████╗ ████████╗",
+	"██╔════╝██╔════╝██║  ██║   ██╔════╝██║  ██║██╔══██╗╚══██╔══╝",
+	"███████╗███████╗███████║   ██║     ███████║███████║   ██║   ",
+	"╚════██║╚════██║██╔══██║   ██║     ██╔══██║██╔══██║   ██║   ",
+	"███████║███████║██║  ██║   ╚██████╗██║  ██║██║  ██║   ██║   ",
+	"╚══════╝╚══════╝╚═╝  ╚═╝    ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ",
+}
+
+var welcomeLogoStacked = []string{
+	"███████╗███████╗██╗  ██╗",
+	"██╔════╝██╔════╝██║  ██║",
+	"███████╗███████╗███████║",
+	"╚════██║╚════██║██╔══██║",
+	"███████║███████║██║  ██║",
+	"╚══════╝╚══════╝╚═╝  ╚═╝",
+	"",
+	" ██████╗██╗  ██╗ █████╗ ████████╗",
+	"██╔════╝██║  ██║██╔══██╗╚══██╔══╝",
+	"██║     ███████║███████║   ██║   ",
+	"██║     ██╔══██║██╔══██║   ██║   ",
+	"╚██████╗██║  ██║██║  ██║   ██║   ",
+	" ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ",
+}
 
 func NewWelcome(config Config) tea.Model {
 	m := welcomeModel{
@@ -80,9 +108,9 @@ func (m *welcomeModel) resize(width, height int) {
 
 func (m welcomeModel) render() string {
 	frame := safeFrameSize(m.width, m.height)
-	boxW := min(frame.width, welcomeTargetBoxWidth)
+	boxW := m.welcomeBoxWidth(frame.width, frame.height)
 
-	box := m.renderWelcomeBox(boxW)
+	box := m.renderWelcomeBox(boxW, frame.height)
 	return lipgloss.NewStyle().
 		Width(frame.width).
 		Height(frame.height).
@@ -90,19 +118,66 @@ func (m welcomeModel) render() string {
 		Render(box)
 }
 
-func (m welcomeModel) renderWelcomeBox(width int) string {
+func (m welcomeModel) welcomeBoxWidth(frameWidth, frameHeight int) int {
+	boxFrameW := m.styles.welcomeBox.GetHorizontalFrameSize()
+	if canRenderWelcomeLogo(frameWidth-boxFrameW, frameHeight, welcomeLogoFull) {
+		return min(frameWidth, welcomeLogoFullWidth+boxFrameW)
+	}
+	if canRenderWelcomeLogo(frameWidth-boxFrameW, frameHeight, welcomeLogoStacked) {
+		return min(frameWidth, welcomeLogoStackedWidth+boxFrameW)
+	}
+	return min(frameWidth, welcomeTargetBoxWidth)
+}
+
+func (m welcomeModel) renderWelcomeBox(width, frameHeight int) string {
 	contentW := max(1, width-m.styles.welcomeBox.GetHorizontalFrameSize())
-	lines := []string{
+	lines := welcomeLogoLines(contentW, frameHeight)
+	if len(lines) > 0 {
+		lines = append(lines, "")
+	}
+	lines = append(lines,
 		m.styles.welcomeTitle.Render(ansi.Truncate(welcomeTitleLine, contentW, "")),
 		"",
 		m.styles.welcomePrimary.Render(wrapCenter(welcomeContinueLine, contentW)),
 		m.styles.welcomeSecondary.Render(wrapCenter(welcomeQuitLine, contentW)),
-	}
+	)
 	body := strings.Join(lines, "\n")
 
 	return m.styles.welcomeBox.
 		Width(width).
 		Render(body)
+}
+
+func welcomeLogoLines(contentWidth, frameHeight int) []string {
+	switch {
+	case canRenderWelcomeLogo(contentWidth, frameHeight, welcomeLogoFull):
+		return centerWelcomeLogo(welcomeLogoFull, contentWidth)
+	case canRenderWelcomeLogo(contentWidth, frameHeight, welcomeLogoStacked):
+		return centerWelcomeLogo(welcomeLogoStacked, contentWidth)
+	default:
+		return nil
+	}
+}
+
+func canRenderWelcomeLogo(contentWidth, frameHeight int, logo []string) bool {
+	const baseBodyRows = 4 // title, spacer, continue hint, quit hint
+	return contentWidth >= maxLineWidth(logo) && frameHeight >= baseBodyRows+len(logo)+1+4
+}
+
+func centerWelcomeLogo(logo []string, width int) []string {
+	lines := make([]string, len(logo))
+	for i, line := range logo {
+		lines[i] = lipgloss.NewStyle().Width(width).Align(lipgloss.Center).Render(line)
+	}
+	return lines
+}
+
+func maxLineWidth(lines []string) int {
+	width := 0
+	for _, line := range lines {
+		width = max(width, lipgloss.Width(line))
+	}
+	return width
 }
 
 func wrapCenter(text string, width int) string {

@@ -37,6 +37,27 @@ func TestWelcomeViewUsesFullFrame(t *testing.T) {
 	}
 }
 
+func TestWelcomeShowsFullLogoWhenItFits(t *testing.T) {
+	m := newWelcomeModel(t, Config{Width: 70, Height: 15})
+
+	view := m.View()
+	if !strings.Contains(view.Content, welcomeLogoFull[0]) {
+		t.Fatalf("welcome view should include full logo, got %q", view.Content)
+	}
+}
+
+func TestWelcomeStacksLogoWhenTooNarrow(t *testing.T) {
+	m := newWelcomeModel(t, Config{Width: 45, Height: 22})
+
+	view := m.View()
+	if strings.Contains(view.Content, welcomeLogoFull[0]) {
+		t.Fatalf("welcome view should not include full logo when narrow, got %q", view.Content)
+	}
+	if !strings.Contains(view.Content, welcomeLogoStacked[0]) || !strings.Contains(view.Content, welcomeLogoStacked[7]) {
+		t.Fatalf("welcome view should include stacked logo, got %q", view.Content)
+	}
+}
+
 func TestWelcomeEnterRequestsContinue(t *testing.T) {
 	m := newWelcomeModel(t, Config{Width: 40, Height: 8})
 	_, cmd := m.Update(keySpecial(tea.KeyEnter))
