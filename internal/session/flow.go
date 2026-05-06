@@ -20,6 +20,8 @@ func (m *model) applyFlowIntent(msg tea.Msg) tea.Cmd {
 		return m.continueFromCurrentView()
 	case tui.BackRequested:
 		return m.backFromCurrentView()
+	case tui.AuthSubmissionRequested:
+		return m.submitAuth(msg)
 	case tui.MainMenuSelectionRequested:
 		return m.openMainMenuSelection(msg.Action)
 	case tui.RoomSelected:
@@ -34,7 +36,7 @@ func (m *model) applyFlowIntent(msg tea.Msg) tea.Cmd {
 func (m *model) continueFromCurrentView() tea.Cmd {
 	switch m.view {
 	case viewWelcome:
-		return m.showStandaloneView(viewMainMenu)
+		return m.showStandaloneView(viewAuth)
 	default:
 		return nil
 	}
@@ -42,13 +44,24 @@ func (m *model) continueFromCurrentView() tea.Cmd {
 
 func (m *model) backFromCurrentView() tea.Cmd {
 	switch m.view {
-	case viewMainMenu:
+	case viewAuth:
 		return m.showStandaloneView(viewWelcome)
+	case viewMainMenu:
+		return m.showStandaloneView(viewAuth)
 	case viewMyChats:
 		return m.showStandaloneView(viewMainMenu)
 	default:
 		return nil
 	}
+}
+
+func (m *model) submitAuth(_ tui.AuthSubmissionRequested) tea.Cmd {
+	if m.view != viewAuth {
+		return nil
+	}
+	// Real authentication will validate this submission before entering the app.
+	// For now, the auth view is a navigation gate with form collection only.
+	return m.showStandaloneView(viewMainMenu)
 }
 
 func (m *model) openMainMenuSelection(action tui.MainMenuAction) tea.Cmd {
@@ -119,6 +132,8 @@ func (m model) newUI(view viewState) tea.Model {
 	switch view {
 	case viewWelcome:
 		return tui.NewWelcome(config)
+	case viewAuth:
+		return tui.NewAuth(config)
 	case viewMainMenu:
 		return tui.NewMainMenu(config)
 	case viewMyChats:

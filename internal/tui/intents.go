@@ -20,6 +20,16 @@ type ContinueRequested struct{}
 // BackRequested asks the session to return to the previous full-screen view.
 type BackRequested struct{}
 
+// AuthSubmissionRequested asks the session layer to authenticate or create a user.
+// The TUI only collects form data; storage and password validation live outside
+// the view.
+type AuthSubmissionRequested struct {
+	Mode            AuthMode
+	Username        string
+	Password        string
+	ConfirmPassword string
+}
+
 // MainMenuAction identifies which main menu button was selected.
 type MainMenuAction int
 
@@ -54,6 +64,12 @@ func requestContinue() tea.Msg {
 
 func requestBack() tea.Msg {
 	return BackRequested{}
+}
+
+func requestAuthSubmission(submission AuthSubmissionRequested) tea.Cmd {
+	return func() tea.Msg {
+		return submission
+	}
 }
 
 func requestMainMenuSelection(action MainMenuAction) tea.Cmd {

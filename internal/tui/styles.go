@@ -101,6 +101,50 @@ func inputStyles(isDark bool) textinput.Styles {
 	return s
 }
 
+type authStyles struct {
+	box         lipgloss.Style
+	heading     lipgloss.Style
+	tab         lipgloss.Style
+	activeTab   lipgloss.Style
+	label       lipgloss.Style
+	activeLabel lipgloss.Style
+	inputLine   lipgloss.Style
+	hint        lipgloss.Style
+}
+
+func newAuthStyles(isDark bool) authStyles {
+	borderColor := lipgloss.Color(mainMenuBorderColor)
+	activeForeground := lipgloss.Color(mainMenuSelectedButtonFg)
+	activeBackground := lipgloss.Color(mainMenuSelectedButtonBg)
+	inactiveForeground := lipgloss.Color(mainMenuInactiveButtonFg)
+	if !isDark {
+		borderColor = lipgloss.Color(lightWelcomeBorder)
+		activeForeground = lipgloss.Color(lightMainMenuSelectedFg)
+		activeBackground = lipgloss.Color(lightMainMenuSelectedBg)
+		inactiveForeground = lipgloss.Color(lightWelcomeBorder)
+	}
+
+	return authStyles{
+		box: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			Padding(0, 3).
+			BorderForeground(borderColor),
+		heading: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(mainMenuHeaderColor)),
+		tab: lipgloss.NewStyle().
+			Foreground(inactiveForeground).
+			Padding(0, 2),
+		activeTab: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(activeForeground).
+			Background(activeBackground).
+			Padding(0, 2),
+		label:       lipgloss.NewStyle().Foreground(inactiveForeground),
+		activeLabel: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(composerAccentColor)),
+		inputLine:   lipgloss.NewStyle().Padding(0, 2),
+		hint:        lipgloss.NewStyle().Faint(true).Foreground(inactiveForeground),
+	}
+}
+
 type mainMenuStyles struct {
 	box            lipgloss.Style
 	heading        lipgloss.Style

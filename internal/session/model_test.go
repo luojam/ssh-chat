@@ -235,7 +235,7 @@ func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
 	}
 }
 
-func TestWelcomeContinueShowsMainMenu(t *testing.T) {
+func TestWelcomeContinueShowsAuth(t *testing.T) {
 	m := newModel(t, Config{
 		Width:  40,
 		Height: 8,
@@ -245,7 +245,29 @@ func TestWelcomeContinueShowsMainMenu(t *testing.T) {
 
 	next, cmd := m.Update(tui.ContinueRequested{})
 	if cmd == nil {
-		t.Fatal("ContinueRequested from welcome should initialize main menu")
+		t.Fatal("ContinueRequested from welcome should initialize auth")
+	}
+	m = assertModel(t, next)
+	if m.view != viewAuth {
+		t.Fatalf("view = %d, want viewAuth", m.view)
+	}
+	if m.subscription != nil {
+		t.Fatal("auth should not join the room")
+	}
+}
+
+func TestAuthSubmissionShowsMainMenu(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterAuth(t, m)
+
+	next, cmd := m.Update(tui.AuthSubmissionRequested{Mode: tui.AuthModeLogin, Username: "user", Password: "password"})
+	if cmd == nil {
+		t.Fatal("AuthSubmissionRequested from auth should initialize main menu")
 	}
 	m = assertModel(t, next)
 	if m.view != viewMainMenu {
@@ -256,7 +278,29 @@ func TestWelcomeContinueShowsMainMenu(t *testing.T) {
 	}
 }
 
-func TestBackFromMainMenuReturnsToWelcome(t *testing.T) {
+func TestBackFromAuthReturnsToWelcome(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 12,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterAuth(t, m)
+
+	next, cmd := m.Update(tui.BackRequested{})
+	if cmd == nil {
+		t.Fatal("BackRequested from auth should initialize welcome")
+	}
+	m = assertModel(t, next)
+	if m.view != viewWelcome {
+		t.Fatalf("view = %d, want viewWelcome", m.view)
+	}
+	if m.subscription != nil {
+		t.Fatal("welcome should not join the room")
+	}
+}
+
+func TestBackFromMainMenuReturnsToAuth(t *testing.T) {
 	m := newModel(t, Config{
 		Width:  40,
 		Height: 12,
@@ -267,14 +311,14 @@ func TestBackFromMainMenuReturnsToWelcome(t *testing.T) {
 
 	next, cmd := m.Update(tui.BackRequested{})
 	if cmd == nil {
-		t.Fatal("BackRequested from main menu should initialize welcome")
+		t.Fatal("BackRequested from main menu should initialize auth")
 	}
 	m = assertModel(t, next)
-	if m.view != viewWelcome {
-		t.Fatalf("view = %d, want viewWelcome", m.view)
+	if m.view != viewAuth {
+		t.Fatalf("view = %d, want viewAuth", m.view)
 	}
 	if m.subscription != nil {
-		t.Fatal("welcome should not join the room")
+		t.Fatal("auth should not join the room")
 	}
 }
 
@@ -612,12 +656,28 @@ func enterMyChats(t *testing.T, m model) model {
 	return m
 }
 
-func enterMainMenu(t *testing.T, m model) model {
+func enterAuth(t *testing.T, m model) model {
 	t.Helper()
 
 	next, cmd := m.Update(tui.ContinueRequested{})
 	if cmd == nil {
-		t.Fatal("continue from welcome should return main menu startup command")
+		t.Fatal("continue from welcome should return auth startup command")
+	}
+
+	m = assertModel(t, next)
+	if m.view != viewAuth {
+		t.Fatalf("view = %d, want viewAuth", m.view)
+	}
+	return m
+}
+
+func enterMainMenu(t *testing.T, m model) model {
+	t.Helper()
+
+	m = enterAuth(t, m)
+	next, cmd := m.Update(tui.AuthSubmissionRequested{Mode: tui.AuthModeLogin, Username: "user", Password: "password"})
+	if cmd == nil {
+		t.Fatal("auth submission should return main menu startup command")
 	}
 
 	m = assertModel(t, next)
