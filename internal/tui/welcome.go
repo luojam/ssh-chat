@@ -47,7 +47,7 @@ var welcomeLogoStacked = []string{
 func NewWelcome(config Config) tea.Model {
 	m := welcomeModel{
 		screen:     newScreenState(config),
-		styles:     newStyles(true),
+		styles:     newBaseStyles(true),
 		initialCmd: nil,
 	}
 	m.resize(config.Width, config.Height)
@@ -57,13 +57,13 @@ func NewWelcome(config Config) tea.Model {
 type welcomeModel struct {
 	screen screenState
 
-	styles styles
+	styles baseStyles
 
 	initialCmd tea.Cmd
 }
 
 func (m welcomeModel) Init() tea.Cmd {
-	return screenInit(m.initialCmd)
+	return fullScreenInit(m.initialCmd)
 }
 
 func (m welcomeModel) View() tea.View {
@@ -92,7 +92,7 @@ func (m *welcomeModel) setDark(isDark bool) {
 	if !m.screen.setDark(isDark) {
 		return
 	}
-	m.styles = newStyles(isDark)
+	m.styles = newBaseStyles(isDark)
 }
 
 func (m *welcomeModel) resize(width, height int) {

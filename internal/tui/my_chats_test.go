@@ -24,13 +24,13 @@ func TestMyChatsViewShowsRoomList(t *testing.T) {
 			t.Fatalf("line %d width = %d, want 50", i, got)
 		}
 	}
-	if !strings.Contains(view.Content, chatListTitle) {
+	if !strings.Contains(view.Content, myChatsTitle) {
 		t.Fatalf("my chats view should include title, got %q", view.Content)
 	}
 	if !strings.Contains(view.Content, "Town Square") {
 		t.Fatalf("my chats view should include Town Square room, got %q", view.Content)
 	}
-	if !strings.Contains(view.Content, chatListHintLine) {
+	if !strings.Contains(view.Content, myChatsHintLine) {
 		t.Fatalf("my chats view should include key hints, got %q", view.Content)
 	}
 }

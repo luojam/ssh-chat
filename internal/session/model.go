@@ -15,7 +15,7 @@ type viewState int
 
 const (
 	viewWelcome viewState = iota
-	viewDashboard
+	viewMainMenu
 	viewMyChats
 	viewChat
 )
@@ -89,8 +89,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.continueFromCurrentView()
 	case tui.BackRequested:
 		return m, m.backFromCurrentView()
-	case tui.DashboardSelectionRequested:
-		return m, m.openDashboardSelection(msg.Action)
+	case tui.MainMenuSelectionRequested:
+		return m, m.openMainMenuSelection(msg.Action)
 	case tui.LeaveRequested:
 		return m, m.leaveChat()
 	case tui.SendRequested:
@@ -156,8 +156,8 @@ func (m model) waitForRoomEvent() tea.Cmd {
 func (m *model) continueFromCurrentView() tea.Cmd {
 	switch m.view {
 	case viewWelcome:
-		return m.showDashboard()
-	case viewDashboard, viewMyChats:
+		return m.showMainMenu()
+	case viewMainMenu, viewMyChats:
 		return m.startChat()
 	default:
 		return nil
@@ -166,31 +166,31 @@ func (m *model) continueFromCurrentView() tea.Cmd {
 
 func (m *model) backFromCurrentView() tea.Cmd {
 	if m.view == viewMyChats {
-		return m.showDashboard()
+		return m.showMainMenu()
 	}
 	return nil
 }
 
-func (m *model) openDashboardSelection(action tui.DashboardAction) tea.Cmd {
-	if m.view != viewDashboard {
+func (m *model) openMainMenuSelection(action tui.MainMenuAction) tea.Cmd {
+	if m.view != viewMainMenu {
 		return nil
 	}
 
 	switch action {
-	case tui.DashboardActionMyChats:
+	case tui.MainMenuActionMyChats:
 		return m.showMyChats()
 	default:
 		return nil
 	}
 }
 
-func (m *model) showDashboard() tea.Cmd {
+func (m *model) showMainMenu() tea.Cmd {
 	if m.closed {
 		return nil
 	}
 
-	m.view = viewDashboard
-	m.ui = tui.NewDashboard(tui.Config{
+	m.view = viewMainMenu
+	m.ui = tui.NewMainMenu(tui.Config{
 		Width:  m.width,
 		Height: m.height,
 	})
@@ -215,7 +215,7 @@ func (m *model) startChat() tea.Cmd {
 		return nil
 	}
 
-	m.ui = tui.New(tui.Config{
+	m.ui = tui.NewRoomView(tui.Config{
 		Width:  m.width,
 		Height: m.height,
 	})
@@ -227,7 +227,7 @@ func (m *model) startChat() tea.Cmd {
 }
 
 // leaveChat is navigation plus membership cleanup. Keeping both together makes
-// the invariant explicit: the dashboard view never has an active room subscription.
+// the invariant explicit: the main menu view never has an active room subscription.
 func (m *model) leaveChat() tea.Cmd {
 	if m.closed || !m.joined {
 		return nil
@@ -238,7 +238,7 @@ func (m *model) leaveChat() tea.Cmd {
 		m.subscription = nil
 	}
 	m.joined = false
-	return m.showDashboard()
+	return m.showMainMenu()
 }
 
 func (m model) displayMessage(event chat.Event) (tui.MessageReceived, bool) {

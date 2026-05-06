@@ -9,7 +9,7 @@ import (
 )
 
 func TestInitialLayoutUsesFullFrame(t *testing.T) {
-	m := newModel(t, Config{Width: 40, Height: 8})
+	m := newRoomViewModel(t, Config{Width: 40, Height: 8})
 
 	view := m.View()
 	lines := strings.Split(view.Content, "\n")
@@ -21,7 +21,7 @@ func TestInitialLayoutUsesFullFrame(t *testing.T) {
 			t.Fatalf("line %d width = %d, want 40; line = %q", i, got, line)
 		}
 	}
-	if !strings.Contains(lines[0], appName) {
+	if !strings.Contains(lines[0], roomViewHeaderTitle) {
 		t.Fatalf("header should include app name, got %q", lines[0])
 	}
 	if strings.Contains(lines[0], "connected") || strings.Contains(lines[0], composerQuitHint) {
@@ -54,7 +54,7 @@ func TestInitialLayoutUsesFullFrame(t *testing.T) {
 
 func TestTinyLayoutsUseFullFrameHeight(t *testing.T) {
 	for height := 1; height <= 8; height++ {
-		m := newModel(t, Config{Width: 40, Height: height})
+		m := newRoomViewModel(t, Config{Width: 40, Height: height})
 
 		lines := strings.Split(m.View().Content, "\n")
 		if got := len(lines); got != height {
@@ -64,11 +64,11 @@ func TestTinyLayoutsUseFullFrameHeight(t *testing.T) {
 }
 
 func TestEnterRequestsSendAndClearsInput(t *testing.T) {
-	m := newModel(t, Config{Width: 40, Height: 8})
+	m := newRoomViewModel(t, Config{Width: 40, Height: 8})
 
-	m = updateModel(t, m, keyText("h"))
-	m = updateModel(t, m, keyText("i"))
-	m, cmd := updateModelWithCmd(t, m, keySpecial(tea.KeyEnter))
+	m = updateRoomViewModel(t, m, keyText("h"))
+	m = updateRoomViewModel(t, m, keyText("i"))
+	m, cmd := updateRoomViewModelWithCmd(t, m, keySpecial(tea.KeyEnter))
 
 	if cmd == nil {
 		t.Fatal("enter should request send, got nil command")
@@ -87,7 +87,7 @@ func TestEnterRequestsSendAndClearsInput(t *testing.T) {
 		t.Fatalf("message count = %d, want 0 before display event", got)
 	}
 
-	m = updateModel(t, m, MessageReceived{Body: msg.Body, Mine: true})
+	m = updateRoomViewModel(t, m, MessageReceived{Body: msg.Body, Mine: true})
 
 	view := m.View()
 	if !view.AltScreen {
@@ -99,9 +99,9 @@ func TestEnterRequestsSendAndClearsInput(t *testing.T) {
 }
 
 func TestShortHistoryRendersAboveComposer(t *testing.T) {
-	m := newModel(t, Config{Width: 40, Height: 8})
+	m := newRoomViewModel(t, Config{Width: 40, Height: 8})
 
-	m = updateModel(t, m, MessageReceived{Body: "hi", Mine: true})
+	m = updateRoomViewModel(t, m, MessageReceived{Body: "hi", Mine: true})
 
 	lines := strings.Split(m.View().Content, "\n")
 	if strings.Contains(lines[2], localAuthor) || strings.Contains(lines[2], "hi") {
@@ -114,9 +114,9 @@ func TestShortHistoryRendersAboveComposer(t *testing.T) {
 }
 
 func TestViewportSyncPreservesScrollOnResizeAndThemeChange(t *testing.T) {
-	m := newModel(t, Config{Width: 40, Height: 8})
+	m := newRoomViewModel(t, Config{Width: 40, Height: 8})
 	for i := 0; i < 10; i++ {
-		m = updateModel(t, m, MessageReceived{Body: "message", Mine: true})
+		m = updateRoomViewModel(t, m, MessageReceived{Body: "message", Mine: true})
 	}
 	if !m.viewport.AtBottom() {
 		t.Fatal("received messages should follow to bottom")
@@ -138,14 +138,14 @@ func TestViewportSyncPreservesScrollOnResizeAndThemeChange(t *testing.T) {
 		t.Fatalf("theme change y offset = %d, want preserved offset %d", got, scrolledOffset)
 	}
 
-	m = updateModel(t, m, MessageReceived{Body: "new", Mine: true})
+	m = updateRoomViewModel(t, m, MessageReceived{Body: "new", Mine: true})
 	if !m.viewport.AtBottom() {
 		t.Fatalf("new message should follow to bottom; offset = %d", m.viewport.YOffset())
 	}
 }
 
 func TestCtrlLRequestsLeaveChat(t *testing.T) {
-	m := newModel(t, Config{Width: 40, Height: 8})
+	m := newRoomViewModel(t, Config{Width: 40, Height: 8})
 
 	_, cmd := m.Update(keyCtrl("l"))
 	if cmd == nil {
@@ -162,7 +162,7 @@ func TestCtrlCAndEscRequestQuit(t *testing.T) {
 		keyCtrl("c"),
 		keySpecial(tea.KeyEsc),
 	} {
-		m := newModel(t, Config{Width: 40, Height: 8})
+		m := newRoomViewModel(t, Config{Width: 40, Height: 8})
 		_, cmd := m.Update(msg)
 		if cmd == nil {
 			t.Fatal("expected quit command, got nil")
@@ -174,31 +174,31 @@ func TestCtrlCAndEscRequestQuit(t *testing.T) {
 	}
 }
 
-func newModel(t *testing.T, config Config) model {
+func newRoomViewModel(t *testing.T, config Config) roomViewModel {
 	t.Helper()
 
-	tm := New(config)
-	m, ok := tm.(model)
+	tm := NewRoomView(config)
+	m, ok := tm.(roomViewModel)
 	if !ok {
-		t.Fatalf("new model has type %T, want model", tm)
+		t.Fatalf("new room view model has type %T, want roomViewModel", tm)
 	}
 	return m
 }
 
-func updateModel(t *testing.T, m model, msg tea.Msg) model {
+func updateRoomViewModel(t *testing.T, m roomViewModel, msg tea.Msg) roomViewModel {
 	t.Helper()
 
-	next, _ := updateModelWithCmd(t, m, msg)
+	next, _ := updateRoomViewModelWithCmd(t, m, msg)
 	return next
 }
 
-func updateModelWithCmd(t *testing.T, m model, msg tea.Msg) (model, tea.Cmd) {
+func updateRoomViewModelWithCmd(t *testing.T, m roomViewModel, msg tea.Msg) (roomViewModel, tea.Cmd) {
 	t.Helper()
 
 	next, cmd := m.Update(msg)
-	updated, ok := next.(model)
+	updated, ok := next.(roomViewModel)
 	if !ok {
-		t.Fatalf("updated model has type %T, want model", next)
+		t.Fatalf("updated room view model has type %T, want roomViewModel", next)
 	}
 	return updated, cmd
 }

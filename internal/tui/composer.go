@@ -32,12 +32,12 @@ func newComposer(isDark bool) (textinput.Model, tea.Cmd) {
 	return input, input.Focus()
 }
 
-func (m model) renderComposer(width int) string {
+func (m roomViewModel) renderComposer(width int) string {
 	return renderFullWidth(m.styles.composer.Inline(true), width, m.input.View())
 }
 
 // renderComposerSection draws optional separator lines above and below the input row.
-func (m model) renderComposerSection(width int, showFrame bool) string {
+func (m roomViewModel) renderComposerSection(width int, showFrame bool) string {
 	line := m.renderComposer(width)
 	if !showFrame {
 		return line
@@ -49,7 +49,7 @@ func (m model) renderComposerSection(width int, showFrame bool) string {
 	)
 }
 
-func (m model) renderInputSeparator(width int) string {
+func (m roomViewModel) renderInputSeparator(width int) string {
 	line := strings.Repeat(string(inputSepRune), max(1, width))
 	return renderFullWidth(m.styles.inputSep, width, line)
 }

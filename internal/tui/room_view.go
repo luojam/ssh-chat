@@ -19,12 +19,12 @@ type Config struct {
 	Height int
 }
 
-func New(config Config) tea.Model {
+func NewRoomView(config Config) tea.Model {
 	input, focusCmd := newComposer(true)
 
-	m := model{
+	m := roomViewModel{
 		screen:     newScreenState(config),
-		styles:     newStyles(true),
+		styles:     newBaseStyles(true),
 		input:      input,
 		viewport:   newMessageViewport(),
 		initialCmd: focusCmd,
@@ -33,10 +33,10 @@ func New(config Config) tea.Model {
 	return m
 }
 
-type model struct {
+type roomViewModel struct {
 	screen screenState
 
-	styles   styles
+	styles   baseStyles
 	input    textinput.Model
 	viewport viewport.Model
 	messages []message
@@ -44,15 +44,15 @@ type model struct {
 	initialCmd tea.Cmd
 }
 
-func (m model) Init() tea.Cmd {
-	return screenInit(m.initialCmd)
+func (m roomViewModel) Init() tea.Cmd {
+	return fullScreenInit(m.initialCmd)
 }
 
-func (m model) View() tea.View {
+func (m roomViewModel) View() tea.View {
 	return fullScreenView(m.render())
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m roomViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
 		m.setDark(msg.IsDark())
@@ -71,7 +71,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *model) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+func (m *roomViewModel) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	switch msg.String() {
 	case keyQuitCtrlC, keyQuitEsc:
 		return true, requestQuit
@@ -84,30 +84,30 @@ func (m *model) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	}
 }
 
-func (m *model) setDark(isDark bool) {
+func (m *roomViewModel) setDark(isDark bool) {
 	if !m.screen.setDark(isDark) {
 		return
 	}
 
-	m.styles = newStyles(isDark)
+	m.styles = newBaseStyles(isDark)
 	m.input.SetStyles(inputStyles(isDark))
 	m.syncMessageViewport(false)
 }
 
-func (m *model) resize(width, height int) {
+func (m *roomViewModel) resize(width, height int) {
 	m.screen.resize(width, height)
 
 	m.syncComposer()
 	m.syncMessageViewport(false)
 }
 
-func (m *model) syncComposer() {
+func (m *roomViewModel) syncComposer() {
 	width := inputWidth(m.frameWidth())
 	m.input.SetWidth(width)
 	m.input.Placeholder = buildPlaceholder(width)
 }
 
-func (m model) render() string {
+func (m roomViewModel) render() string {
 	layout := m.layout()
 	sections := make([]string, 0, 4)
 

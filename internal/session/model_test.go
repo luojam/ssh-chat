@@ -209,7 +209,7 @@ func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
 	}
 }
 
-func TestWelcomeContinueShowsDashboard(t *testing.T) {
+func TestWelcomeContinueShowsMainMenu(t *testing.T) {
 	m := newModel(t, Config{
 		Width:  40,
 		Height: 8,
@@ -219,27 +219,27 @@ func TestWelcomeContinueShowsDashboard(t *testing.T) {
 
 	next, cmd := m.Update(tui.ContinueRequested{})
 	if cmd == nil {
-		t.Fatal("ContinueRequested from welcome should initialize dashboard")
+		t.Fatal("ContinueRequested from welcome should initialize main menu")
 	}
 	m = assertModel(t, next)
-	if m.view != viewDashboard {
-		t.Fatalf("view = %d, want viewDashboard", m.view)
+	if m.view != viewMainMenu {
+		t.Fatalf("view = %d, want viewMainMenu", m.view)
 	}
 	if m.joined || m.subscription != nil {
-		t.Fatal("dashboard should not join the room")
+		t.Fatal("main menu should not join the room")
 	}
 }
 
-func TestDashboardMyChatsSelectionShowsMyChats(t *testing.T) {
+func TestMainMenuMyChatsSelectionShowsMyChats(t *testing.T) {
 	m := newModel(t, Config{
 		Width:  40,
 		Height: 12,
 		Room:   chat.NewRoom(),
 		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
-	m = enterDashboard(t, m)
+	m = enterMainMenu(t, m)
 
-	next, cmd := m.Update(tui.DashboardSelectionRequested{Action: tui.DashboardActionMyChats})
+	next, cmd := m.Update(tui.MainMenuSelectionRequested{Action: tui.MainMenuActionMyChats})
 	if cmd == nil {
 		t.Fatal("My Chats selection should initialize My Chats view")
 	}
@@ -252,24 +252,24 @@ func TestDashboardMyChatsSelectionShowsMyChats(t *testing.T) {
 	}
 }
 
-func TestBackFromMyChatsReturnsToDashboard(t *testing.T) {
+func TestBackFromMyChatsReturnsToMainMenu(t *testing.T) {
 	m := newModel(t, Config{
 		Width:  40,
 		Height: 12,
 		Room:   chat.NewRoom(),
 		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
-	m = enterDashboard(t, m)
-	next, _ := m.Update(tui.DashboardSelectionRequested{Action: tui.DashboardActionMyChats})
+	m = enterMainMenu(t, m)
+	next, _ := m.Update(tui.MainMenuSelectionRequested{Action: tui.MainMenuActionMyChats})
 	m = assertModel(t, next)
 
 	next, cmd := m.Update(tui.BackRequested{})
 	if cmd == nil {
-		t.Fatal("BackRequested from My Chats should initialize dashboard")
+		t.Fatal("BackRequested from My Chats should initialize main menu")
 	}
 	m = assertModel(t, next)
-	if m.view != viewDashboard {
-		t.Fatalf("view = %d, want viewDashboard", m.view)
+	if m.view != viewMainMenu {
+		t.Fatalf("view = %d, want viewMainMenu", m.view)
 	}
 }
 
@@ -280,24 +280,24 @@ func TestContinueFromMyChatsStartsChat(t *testing.T) {
 		Room:   chat.NewRoom(),
 		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
-	m = enterDashboard(t, m)
-	next, _ := m.Update(tui.DashboardSelectionRequested{Action: tui.DashboardActionMyChats})
+	m = enterMainMenu(t, m)
+	next, _ := m.Update(tui.MainMenuSelectionRequested{Action: tui.MainMenuActionMyChats})
 	m = assertModel(t, next)
 
 	next, cmd := m.Update(tui.ContinueRequested{})
 	if cmd == nil {
-		t.Fatal("ContinueRequested from My Chats should start chat")
+		t.Fatal("ContinueRequested from My Chats should start the Room View")
 	}
 	m = assertModel(t, next)
 	if m.view != viewChat {
 		t.Fatalf("view = %d, want viewChat", m.view)
 	}
 	if !m.joined || m.subscription == nil {
-		t.Fatal("model should join selected chat")
+		t.Fatal("model should join selected Room")
 	}
 }
 
-func TestLeaveRequestedReturnsToDashboardAndClosesSubscription(t *testing.T) {
+func TestLeaveRequestedReturnsToMainMenuAndClosesSubscription(t *testing.T) {
 	room := chat.NewRoom()
 	user := newModel(t, Config{
 		Width:  40,
@@ -318,12 +318,12 @@ func TestLeaveRequestedReturnsToDashboardAndClosesSubscription(t *testing.T) {
 
 	next, cmd := user.Update(tui.LeaveRequested{})
 	if cmd == nil {
-		t.Fatal("LeaveRequested should initialize the dashboard view")
+		t.Fatal("LeaveRequested should initialize the main menu view")
 	}
 	user = assertModel(t, next)
 
-	if user.view != viewDashboard {
-		t.Fatalf("view = %d, want viewDashboard", user.view)
+	if user.view != viewMainMenu {
+		t.Fatalf("view = %d, want viewMainMenu", user.view)
 	}
 	if user.joined {
 		t.Fatal("user should no longer be joined after leaving chat")
@@ -362,7 +362,7 @@ func TestStaleRoomEventIgnoredAfterLeavingChat(t *testing.T) {
 		t.Fatal("stale room event after leaving should not continue room wait loop")
 	}
 	if strings.Contains(m.View().Content, "stale") {
-		t.Fatalf("stale room event should not update dashboard view, got %q", m.View().Content)
+		t.Fatalf("stale room event should not update main menu view, got %q", m.View().Content)
 	}
 }
 
@@ -466,10 +466,10 @@ func assertSubscriptionClosed(t *testing.T, subscription *chat.Subscription) {
 func enterChat(t *testing.T, m model) model {
 	t.Helper()
 
-	m = enterDashboard(t, m)
+	m = enterMainMenu(t, m)
 	next, cmd := m.Update(tui.ContinueRequested{})
 	if cmd == nil {
-		t.Fatal("continue from dashboard should return chat startup command")
+		t.Fatal("continue from main menu should return Room View startup command")
 	}
 
 	m = assertModel(t, next)
@@ -477,26 +477,26 @@ func enterChat(t *testing.T, m model) model {
 		t.Fatalf("view = %d, want viewChat", m.view)
 	}
 	if !m.joined {
-		t.Fatal("model should be joined after dashboard continue")
+		t.Fatal("model should be joined after main menu continue")
 	}
 	if m.subscription == nil {
-		t.Fatal("model should set subscription after dashboard continue")
+		t.Fatal("model should set subscription after main menu continue")
 	}
 
 	return m
 }
 
-func enterDashboard(t *testing.T, m model) model {
+func enterMainMenu(t *testing.T, m model) model {
 	t.Helper()
 
 	next, cmd := m.Update(tui.ContinueRequested{})
 	if cmd == nil {
-		t.Fatal("continue from welcome should return dashboard startup command")
+		t.Fatal("continue from welcome should return main menu startup command")
 	}
 
 	m = assertModel(t, next)
-	if m.view != viewDashboard {
-		t.Fatalf("view = %d, want viewDashboard", m.view)
+	if m.view != viewMainMenu {
+		t.Fatalf("view = %d, want viewMainMenu", m.view)
 	}
 	return m
 }

@@ -27,18 +27,18 @@ const (
 	darkWelcomePrimary   = "15"
 	lightWelcomePrimary  = "0"
 
-	dashboardBorderColor      = "62"
-	dashboardSelectedButtonBg = "63"
-	dashboardSelectedButtonFg = "15"
-	dashboardInactiveButtonFg = "250"
-	dashboardHeaderColor      = "14"
-	lightDashboardSelectedFg  = "0"
-	lightDashboardSelectedBg  = "159"
-	lightDashboardInactiveFg  = "255"
-	myChatsSelectedMarker     = "2"
+	mainMenuBorderColor      = "62"
+	mainMenuSelectedButtonBg = "63"
+	mainMenuSelectedButtonFg = "15"
+	mainMenuInactiveButtonFg = "250"
+	mainMenuHeaderColor      = "14"
+	lightMainMenuSelectedFg  = "0"
+	lightMainMenuSelectedBg  = "159"
+	lightMainMenuInactiveFg  = "255"
+	myChatsSelectedMarker    = "2"
 )
 
-type styles struct {
+type baseStyles struct {
 	headerTitle      lipgloss.Style
 	headerDivider    lipgloss.Style
 	empty            lipgloss.Style
@@ -55,8 +55,8 @@ type styles struct {
 	welcomeSecondary lipgloss.Style
 }
 
-func newStyles(isDark bool) styles {
-	s := styles{
+func newBaseStyles(isDark bool) baseStyles {
+	s := baseStyles{
 		headerTitle:      lipgloss.NewStyle().Foreground(lipgloss.Color(headerTitleColor)).Bold(true).Align(lipgloss.Center),
 		headerDivider:    lipgloss.NewStyle().Foreground(lipgloss.Color(headerDividerColor)).Faint(true),
 		empty:            lipgloss.NewStyle().Foreground(lipgloss.Color(emptyMessageColor)),
@@ -101,7 +101,7 @@ func inputStyles(isDark bool) textinput.Styles {
 	return s
 }
 
-type dashboardStyles struct {
+type mainMenuStyles struct {
 	box            lipgloss.Style
 	heading        lipgloss.Style
 	hint           lipgloss.Style
@@ -109,35 +109,35 @@ type dashboardStyles struct {
 	selectedButton lipgloss.Style
 }
 
-func newDashboardStyles(isDark bool) dashboardStyles {
-	borderColor := lipgloss.Color(dashboardBorderColor)
-	selectedForeground := lipgloss.Color(dashboardSelectedButtonFg)
-	selectedBackground := lipgloss.Color(dashboardSelectedButtonBg)
-	inactiveForeground := lipgloss.Color(dashboardInactiveButtonFg)
+func newMainMenuStyles(isDark bool) mainMenuStyles {
+	borderColor := lipgloss.Color(mainMenuBorderColor)
+	selectedForeground := lipgloss.Color(mainMenuSelectedButtonFg)
+	selectedBackground := lipgloss.Color(mainMenuSelectedButtonBg)
+	inactiveForeground := lipgloss.Color(mainMenuInactiveButtonFg)
 	if !isDark {
 		borderColor = lipgloss.Color(lightWelcomeBorder)
-		selectedForeground = lipgloss.Color(lightDashboardSelectedFg)
-		selectedBackground = lipgloss.Color(lightDashboardSelectedBg)
-		inactiveForeground = lipgloss.Color(lightDashboardInactiveFg)
+		selectedForeground = lipgloss.Color(lightMainMenuSelectedFg)
+		selectedBackground = lipgloss.Color(lightMainMenuSelectedBg)
+		inactiveForeground = lipgloss.Color(lightMainMenuInactiveFg)
 	}
 
-	return dashboardStyles{
+	return mainMenuStyles{
 		box: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			Padding(2, 3).
 			BorderForeground(borderColor),
-		heading: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(dashboardHeaderColor)),
+		heading: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(mainMenuHeaderColor)),
 		hint:    lipgloss.NewStyle().Faint(true).Foreground(inactiveForeground),
 		button: lipgloss.NewStyle().
 			Foreground(inactiveForeground).
 			Padding(0, 2).
-			MarginRight(dashboardButtonGap),
+			MarginRight(mainMenuButtonGap),
 		selectedButton: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(selectedForeground).
 			Background(selectedBackground).
 			Padding(0, 2).
-			MarginRight(dashboardButtonGap),
+			MarginRight(mainMenuButtonGap),
 	}
 }
 
@@ -153,7 +153,7 @@ func newMyChatsStyles(isDark bool) myChatsStyles {
 		listBorder: lipgloss.NewStyle(),
 		hint: lipgloss.NewStyle().
 			Faint(true).
-			Foreground(lipgloss.Color(dashboardInactiveButtonFg)),
+			Foreground(lipgloss.Color(mainMenuInactiveButtonFg)),
 	}
 }
 
@@ -168,7 +168,7 @@ func (s myChatsStyles) listStyles(width int) list.Styles {
 		Width(width).
 		Align(lipgloss.Center)
 	styles.Title = styles.Title.
-		Foreground(lipgloss.Color(dashboardHeaderColor)).
+		Foreground(lipgloss.Color(mainMenuHeaderColor)).
 		Bold(true).
 		UnsetBackground().
 		Padding(0, 0)

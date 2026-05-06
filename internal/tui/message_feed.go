@@ -23,41 +23,6 @@ type message struct {
 	mine   bool
 }
 
-// SendRequested is an intent from the interface, not an accepted chat message.
-// The session layer decides whether this becomes backend state.
-type SendRequested struct {
-	Body string
-}
-
-// QuitRequested lets the session layer release per-connection resources before
-// it asks Bubble Tea to stop the program.
-type QuitRequested struct{}
-
-// ContinueRequested is emitted when a full-screen view asks the session to move
-// forward in the flow: welcome enters dashboard, room lists enter chat.
-type ContinueRequested struct{}
-
-// BackRequested asks the session to return to the previous full-screen view.
-type BackRequested struct{}
-
-// DashboardAction identifies which dashboard button was selected.
-type DashboardAction int
-
-const (
-	DashboardActionMyChats DashboardAction = iota
-	DashboardActionManageChats
-	DashboardActionSettings
-)
-
-// DashboardSelectionRequested asks the session to open the selected dashboard area.
-type DashboardSelectionRequested struct {
-	Action DashboardAction
-}
-
-// LeaveRequested is emitted by the chat view when the user chooses to leave the
-// room without quitting the SSH session.
-type LeaveRequested struct{}
-
 // MessageReceived is display data for the terminal. Backend message IDs,
 // delivery rules, and storage details stay outside the TUI.
 type MessageReceived struct {
@@ -74,7 +39,7 @@ func newMessageViewport() viewport.Model {
 	return vp
 }
 
-func (m *model) requestSend() tea.Cmd {
+func (m *roomViewModel) requestSend() tea.Cmd {
 	body := strings.TrimSpace(m.input.Value())
 	if body == "" {
 		return nil
@@ -86,29 +51,7 @@ func (m *model) requestSend() tea.Cmd {
 	}
 }
 
-func requestQuit() tea.Msg {
-	return QuitRequested{}
-}
-
-func requestContinue() tea.Msg {
-	return ContinueRequested{}
-}
-
-func requestBack() tea.Msg {
-	return BackRequested{}
-}
-
-func requestDashboardSelection(action DashboardAction) tea.Cmd {
-	return func() tea.Msg {
-		return DashboardSelectionRequested{Action: action}
-	}
-}
-
-func requestLeave() tea.Msg {
-	return LeaveRequested{}
-}
-
-func (m *model) receiveMessage(msg MessageReceived) {
+func (m *roomViewModel) receiveMessage(msg MessageReceived) {
 	m.messages = append(m.messages, message{
 		author: msg.Author,
 		body:   msg.Body,
@@ -119,7 +62,7 @@ func (m *model) receiveMessage(msg MessageReceived) {
 
 // Keep viewport synchronization in mutation paths, not View. Bubble Tea child
 // models often carry state such as scroll position; rendering should observe it.
-func (m *model) syncMessageViewport(follow bool) {
+func (m *roomViewModel) syncMessageViewport(follow bool) {
 	wasAtBottom := m.viewport.AtBottom()
 	layout := m.layout()
 
@@ -131,11 +74,11 @@ func (m *model) syncMessageViewport(follow bool) {
 	}
 }
 
-func (m model) renderMessages() string {
+func (m roomViewModel) renderMessages() string {
 	return m.viewport.View()
 }
 
-func (m model) messageLines(width int) []string {
+func (m roomViewModel) messageLines(width int) []string {
 	if len(m.messages) == 0 {
 		return []string{m.styles.empty.Render(ansi.Truncate(emptyStateText, width, ""))}
 	}
@@ -147,7 +90,7 @@ func (m model) messageLines(width int) []string {
 	return lines
 }
 
-func (m model) bottomAlignedMessageLines(width, height int) []string {
+func (m roomViewModel) bottomAlignedMessageLines(width, height int) []string {
 	lines := m.messageLines(width)
 	if height <= 0 || len(lines) >= height {
 		return lines
@@ -157,7 +100,7 @@ func (m model) bottomAlignedMessageLines(width, height int) []string {
 	return append(padding, lines...)
 }
 
-func (m model) renderMessage(msg message, width int) []string {
+func (m roomViewModel) renderMessage(msg message, width int) []string {
 	if width <= authorColumnWidth+1 {
 		return []string{m.styles.body.Render(ansi.Truncate(msg.body, width, ""))}
 	}
@@ -182,7 +125,7 @@ func (m model) renderMessage(msg message, width int) []string {
 	return lines
 }
 
-func (m model) messageAuthorStyle(msg message) lipgloss.Style {
+func (m roomViewModel) messageAuthorStyle(msg message) lipgloss.Style {
 	if msg.mine {
 		return m.styles.mineAuthor
 	}

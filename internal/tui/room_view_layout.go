@@ -2,15 +2,10 @@ package tui
 
 import "charm.land/lipgloss/v2"
 
-type frameSize struct {
-	width  int
-	height int
-}
-
-// chatLayout is the small contract between sizing and rendering.
+// roomViewLayout is the small contract between sizing and rendering.
 // Keeping every row decision here prevents render paths and viewport sizing from
 // drifting apart as the TUI grows.
-type chatLayout struct {
+type roomViewLayout struct {
 	width          int
 	height         int
 	messageRows    int
@@ -18,24 +13,17 @@ type chatLayout struct {
 	showInputFrame bool
 }
 
-func safeFrameSize(width, height int) frameSize {
-	return frameSize{
-		width:  safeDimension(width),
-		height: safeDimension(height),
-	}
-}
-
-func (m model) frameWidth() int {
+func (m roomViewModel) frameWidth() int {
 	return safeDimension(m.screen.width)
 }
 
-func (m model) layout() chatLayout {
-	return chatLayoutFor(m.screen.width, m.screen.height)
+func (m roomViewModel) layout() roomViewLayout {
+	return roomViewLayoutFor(m.screen.width, m.screen.height)
 }
 
-func chatLayoutFor(width, height int) chatLayout {
+func roomViewLayoutFor(width, height int) roomViewLayout {
 	frame := safeFrameSize(width, height)
-	layout := chatLayout{
+	layout := roomViewLayout{
 		width:          frame.width,
 		height:         frame.height,
 		showHeader:     frame.height >= 3,
@@ -52,12 +40,6 @@ func chatLayoutFor(width, height int) chatLayout {
 	layout.messageRows = max(0, frame.height-usedRows)
 
 	return layout
-}
-
-// Bubble Tea can send zero dimensions before the first resize message.
-// Rendering still needs at least one cell so string truncation stays valid.
-func safeDimension(n int) int {
-	return max(1, n)
 }
 
 func inputWidth(width int) int {

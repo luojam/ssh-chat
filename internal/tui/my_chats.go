@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	chatListTitle          = "My Chats"
-	chatListHintLine       = "↑/up ↓/down • enter select • esc back"
+	myChatsTitle           = "My Chats"
+	myChatsHintLine        = "↑/up ↓/down • enter select • esc back"
 	myChatsTargetWidth     = 56
 	myChatsTargetHeight    = 20
 	myChatsListTargetWidth = 32
@@ -18,13 +18,13 @@ const (
 	myChatsContainerPadY   = 1
 )
 
-type chatRoomItem struct {
+type myChatsRoomItem struct {
 	title string
 }
 
-func (i chatRoomItem) Title() string       { return i.title }
-func (i chatRoomItem) Description() string { return "" }
-func (i chatRoomItem) FilterValue() string { return i.title }
+func (i myChatsRoomItem) Title() string       { return i.title }
+func (i myChatsRoomItem) Description() string { return "" }
+func (i myChatsRoomItem) FilterValue() string { return i.title }
 
 func NewMyChats(config Config) tea.Model {
 	styles := newMyChatsStyles(true)
@@ -45,7 +45,7 @@ type myChatsModel struct {
 }
 
 func (m myChatsModel) Init() tea.Cmd {
-	return screenInit()
+	return fullScreenInit()
 }
 
 func (m myChatsModel) View() tea.View {
@@ -112,7 +112,7 @@ func (m myChatsModel) render() string {
 		m.styles.hint.
 			Width(layout.content.width).
 			Align(lipgloss.Center).
-			Render(chatListHintLine),
+			Render(myChatsHintLine),
 	)
 
 	container := lipgloss.NewStyle().
@@ -128,8 +128,8 @@ func (m myChatsModel) render() string {
 }
 
 func newMyChatsList(styles myChatsStyles) list.Model {
-	l := list.New(myChatRoomItems(), styles.listDelegate(), 1, 1)
-	l.Title = chatListTitle
+	l := list.New(myChatsRoomItems(), styles.listDelegate(), 1, 1)
+	l.Title = myChatsTitle
 	l.Styles = styles.listStyles(1)
 	l.SetFilteringEnabled(false)
 	l.SetShowFilter(false)
@@ -141,9 +141,10 @@ func newMyChatsList(styles myChatsStyles) list.Model {
 	return l
 }
 
-func myChatRoomItems() []list.Item {
+// TODO: These will be fetched from the server
+func myChatsRoomItems() []list.Item {
 	return []list.Item{
-		chatRoomItem{title: "Town Square"},
+		myChatsRoomItem{title: "Town Square"},
 	}
 }
 
