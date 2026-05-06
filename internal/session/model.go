@@ -165,10 +165,14 @@ func (m *model) continueFromCurrentView() tea.Cmd {
 }
 
 func (m *model) backFromCurrentView() tea.Cmd {
-	if m.view == viewMyChats {
+	switch m.view {
+	case viewMainMenu:
+		return m.showWelcome()
+	case viewMyChats:
 		return m.showMainMenu()
+	default:
+		return nil
 	}
-	return nil
 }
 
 func (m *model) openMainMenuSelection(action tui.MainMenuAction) tea.Cmd {
@@ -182,6 +186,19 @@ func (m *model) openMainMenuSelection(action tui.MainMenuAction) tea.Cmd {
 	default:
 		return nil
 	}
+}
+
+func (m *model) showWelcome() tea.Cmd {
+	if m.closed {
+		return nil
+	}
+
+	m.view = viewWelcome
+	m.ui = tui.NewWelcome(tui.Config{
+		Width:  m.width,
+		Height: m.height,
+	})
+	return m.ui.Init()
 }
 
 func (m *model) showMainMenu() tea.Cmd {

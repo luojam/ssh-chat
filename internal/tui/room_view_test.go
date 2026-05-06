@@ -144,33 +144,28 @@ func TestViewportSyncPreservesScrollOnResizeAndThemeChange(t *testing.T) {
 	}
 }
 
-func TestCtrlLRequestsLeaveChat(t *testing.T) {
+func TestEscRequestsLeaveRoomView(t *testing.T) {
 	m := newRoomViewModel(t, Config{Width: 40, Height: 8})
 
-	_, cmd := m.Update(keyCtrl("l"))
+	_, cmd := m.Update(keySpecial(tea.KeyEsc))
 	if cmd == nil {
-		t.Fatal("ctrl+l should request leaving chat")
+		t.Fatal("esc should request leaving room view")
 	}
 	msg := cmd()
 	if _, ok := msg.(LeaveRequested); !ok {
-		t.Fatalf("ctrl+l command returned %T, want LeaveRequested", msg)
+		t.Fatalf("esc command returned %T, want LeaveRequested", msg)
 	}
 }
 
-func TestCtrlCAndEscRequestQuit(t *testing.T) {
-	for _, msg := range []tea.KeyPressMsg{
-		keyCtrl("c"),
-		keySpecial(tea.KeyEsc),
-	} {
-		m := newRoomViewModel(t, Config{Width: 40, Height: 8})
-		_, cmd := m.Update(msg)
-		if cmd == nil {
-			t.Fatal("expected quit command, got nil")
-		}
-		msg := cmd()
-		if _, ok := msg.(QuitRequested); !ok {
-			t.Fatalf("expected QuitRequested, got %T", msg)
-		}
+func TestCtrlCRequestsQuit(t *testing.T) {
+	m := newRoomViewModel(t, Config{Width: 40, Height: 8})
+	_, cmd := m.Update(keyCtrl("c"))
+	if cmd == nil {
+		t.Fatal("ctrl+c should request quit")
+	}
+	msg := cmd()
+	if _, ok := msg.(QuitRequested); !ok {
+		t.Fatalf("ctrl+c command returned %T, want QuitRequested", msg)
 	}
 }
 

@@ -8,10 +8,9 @@ import (
 )
 
 const (
-	keyQuitCtrlC = "ctrl+c"
-	keyQuitEsc   = "esc"
-	keySend      = "enter"
-	keyLeaveChat = "ctrl+l"
+	keyQuit = "ctrl+c"
+	keyBack = "esc"
+	keySend = "enter"
 )
 
 type Config struct {
@@ -73,9 +72,9 @@ func (m roomViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *roomViewModel) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	switch msg.String() {
-	case keyQuitCtrlC, keyQuitEsc:
+	case keyQuit:
 		return true, requestQuit
-	case keyLeaveChat:
+	case keyBack:
 		return true, requestLeave
 	case keySend:
 		return true, m.requestSend()

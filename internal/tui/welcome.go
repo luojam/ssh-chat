@@ -11,7 +11,7 @@ import (
 const (
 	welcomeTitleLine      = "Welcome!"
 	welcomeContinueLine   = "Press enter to continue..."
-	welcomeQuitLine       = "Esc to exit"
+	welcomeQuitLine       = "Ctrl+c to quit"
 	welcomeTargetBoxWidth = 40
 
 	welcomeLogoFullWidth       = 60
@@ -78,7 +78,7 @@ func (m welcomeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resize(msg.Width, msg.Height)
 	case tea.KeyPressMsg:
 		switch msg.String() {
-		case keyQuitCtrlC, keyQuitEsc:
+		case keyQuit:
 			return m, requestQuit
 		case keySend:
 			return m, requestContinue

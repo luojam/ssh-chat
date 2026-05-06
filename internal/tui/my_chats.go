@@ -8,7 +8,7 @@ import (
 
 const (
 	myChatsTitle           = "My Chats"
-	myChatsHintLine        = "↑/up ↓/down • enter select • esc back"
+	myChatsHintLine        = "↑/↓ move • enter • esc back • ctrl+c quit"
 	myChatsTargetWidth     = 56
 	myChatsTargetHeight    = 20
 	myChatsListTargetWidth = 32
@@ -60,9 +60,9 @@ func (m myChatsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resize(msg.Width, msg.Height)
 	case tea.KeyPressMsg:
 		switch msg.String() {
-		case keyQuitCtrlC:
+		case keyQuit:
 			return m, requestQuit
-		case keyQuitEsc:
+		case keyBack:
 			return m, requestBack
 		case keySend:
 			return m, requestContinue

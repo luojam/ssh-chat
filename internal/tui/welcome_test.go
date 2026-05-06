@@ -70,20 +70,15 @@ func TestWelcomeEnterRequestsContinue(t *testing.T) {
 	}
 }
 
-func TestWelcomeQuitKeysRequestQuit(t *testing.T) {
-	for _, msg := range []tea.KeyPressMsg{
-		keyCtrl("c"),
-		keySpecial(tea.KeyEsc),
-	} {
-		m := newWelcomeModel(t, Config{Width: 40, Height: 8})
-		_, cmd := m.Update(msg)
-		if cmd == nil {
-			t.Fatal("expected quit command, got nil")
-		}
-		got := cmd()
-		if _, ok := got.(QuitRequested); !ok {
-			t.Fatalf("expected QuitRequested, got %T", got)
-		}
+func TestWelcomeCtrlCRequestsQuit(t *testing.T) {
+	m := newWelcomeModel(t, Config{Width: 40, Height: 8})
+	_, cmd := m.Update(keyCtrl("c"))
+	if cmd == nil {
+		t.Fatal("ctrl+c should request quit")
+	}
+	got := cmd()
+	if _, ok := got.(QuitRequested); !ok {
+		t.Fatalf("ctrl+c command returned %T, want QuitRequested", got)
 	}
 }
 

@@ -230,6 +230,28 @@ func TestWelcomeContinueShowsMainMenu(t *testing.T) {
 	}
 }
 
+func TestBackFromMainMenuReturnsToWelcome(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 12,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterMainMenu(t, m)
+
+	next, cmd := m.Update(tui.BackRequested{})
+	if cmd == nil {
+		t.Fatal("BackRequested from main menu should initialize welcome")
+	}
+	m = assertModel(t, next)
+	if m.view != viewWelcome {
+		t.Fatalf("view = %d, want viewWelcome", m.view)
+	}
+	if m.joined || m.subscription != nil {
+		t.Fatal("welcome should not join the room")
+	}
+}
+
 func TestMainMenuMyChatsSelectionShowsMyChats(t *testing.T) {
 	m := newModel(t, Config{
 		Width:  40,

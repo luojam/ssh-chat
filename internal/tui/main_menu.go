@@ -13,7 +13,7 @@ const (
 	mainMenuMyChatsTitle     = "My Chats"
 	mainMenuManageChatsTitle = "+/-"
 	mainMenuSettingsTitle    = "Settings"
-	mainMenuHintLine         = "←/→ move • enter select • esc exit"
+	mainMenuHintLine         = "←/→ • enter • esc back • ctrl+c quit"
 	mainMenuTargetBoxWidth   = 56
 	mainMenuTargetBoxHeight  = 12
 	mainMenuFramePaddingX    = 2
@@ -88,8 +88,10 @@ func (m mainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *mainMenuModel) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
-	case keyQuitCtrlC, keyQuitEsc:
+	case keyQuit:
 		return requestQuit
+	case keyBack:
+		return requestBack
 	case "left", "h":
 		m.selectPrevious()
 	case "right", "l", "tab":

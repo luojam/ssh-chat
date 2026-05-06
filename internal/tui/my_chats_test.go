@@ -72,6 +72,18 @@ func TestMyChatsEscRequestsBack(t *testing.T) {
 	}
 }
 
+func TestMyChatsCtrlCRequestsQuit(t *testing.T) {
+	m := newMyChatsModel(t, Config{Width: 50, Height: 12})
+
+	_, cmd := m.Update(keyCtrl("c"))
+	if cmd == nil {
+		t.Fatal("ctrl+c should request quit")
+	}
+	if _, ok := cmd().(QuitRequested); !ok {
+		t.Fatalf("ctrl+c command returned %T, want QuitRequested", cmd())
+	}
+}
+
 func newMyChatsModel(t *testing.T, config Config) myChatsModel {
 	t.Helper()
 

@@ -122,11 +122,25 @@ func TestMainMenuEnterRequestsSelectedAction(t *testing.T) {
 	}
 }
 
-func TestMainMenuCtrlLDoesNothing(t *testing.T) {
+func TestMainMenuEscRequestsBack(t *testing.T) {
 	m := newMainMenuModel(t, Config{Width: 40, Height: 8})
-	_, cmd := m.Update(keyCtrl("l"))
-	if cmd != nil {
-		t.Fatalf("ctrl+l command = %T, want nil", cmd())
+	_, cmd := m.Update(keySpecial(tea.KeyEsc))
+	if cmd == nil {
+		t.Fatal("esc should request back")
+	}
+	if _, ok := cmd().(BackRequested); !ok {
+		t.Fatalf("esc command returned %T, want BackRequested", cmd())
+	}
+}
+
+func TestMainMenuCtrlCRequestsQuit(t *testing.T) {
+	m := newMainMenuModel(t, Config{Width: 40, Height: 8})
+	_, cmd := m.Update(keyCtrl("c"))
+	if cmd == nil {
+		t.Fatal("ctrl+c should request quit")
+	}
+	if _, ok := cmd().(QuitRequested); !ok {
+		t.Fatalf("ctrl+c command returned %T, want QuitRequested", cmd())
 	}
 }
 
