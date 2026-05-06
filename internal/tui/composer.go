@@ -10,7 +10,7 @@ import (
 
 const (
 	composerPrompt   = "> "
-	composerQuitHint = "Esc to quit"
+	composerQuitHint = "ctrl+l to go back • Esc to quit"
 	inputSepRune     = '─'
 )
 

@@ -2,7 +2,7 @@ package tui
 
 import "strings"
 
-const appName = "ssh-chat"
+const appName = "roomname"
 
 // renderHeader fills the full width with the header background. The app name
 // is the only content — lipgloss pads the remainder with the background color.

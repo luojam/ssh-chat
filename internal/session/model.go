@@ -9,13 +9,14 @@ import (
 	"github.com/luojam/ssh-chat/internal/tui"
 )
 
-const systemAuthor = "system"
+const systemAuthor = "[system]"
 
 type viewState int
 
 const (
 	viewWelcome viewState = iota
 	viewDashboard
+	viewMyChats
 	viewChat
 )
 
@@ -86,6 +87,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case tui.ContinueRequested:
 		return m, m.continueFromCurrentView()
+	case tui.BackRequested:
+		return m, m.backFromCurrentView()
+	case tui.DashboardSelectionRequested:
+		return m, m.openDashboardSelection(msg.Action)
 	case tui.LeaveRequested:
 		return m, m.leaveChat()
 	case tui.SendRequested:
@@ -152,8 +157,28 @@ func (m *model) continueFromCurrentView() tea.Cmd {
 	switch m.view {
 	case viewWelcome:
 		return m.showDashboard()
-	case viewDashboard:
+	case viewDashboard, viewMyChats:
 		return m.startChat()
+	default:
+		return nil
+	}
+}
+
+func (m *model) backFromCurrentView() tea.Cmd {
+	if m.view == viewMyChats {
+		return m.showDashboard()
+	}
+	return nil
+}
+
+func (m *model) openDashboardSelection(action tui.DashboardAction) tea.Cmd {
+	if m.view != viewDashboard {
+		return nil
+	}
+
+	switch action {
+	case tui.DashboardActionMyChats:
+		return m.showMyChats()
 	default:
 		return nil
 	}
@@ -166,6 +191,19 @@ func (m *model) showDashboard() tea.Cmd {
 
 	m.view = viewDashboard
 	m.ui = tui.NewDashboard(tui.Config{
+		Width:  m.width,
+		Height: m.height,
+	})
+	return m.ui.Init()
+}
+
+func (m *model) showMyChats() tea.Cmd {
+	if m.closed {
+		return nil
+	}
+
+	m.view = viewMyChats
+	m.ui = tui.NewMyChats(tui.Config{
 		Width:  m.width,
 		Height: m.height,
 	})

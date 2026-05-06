@@ -13,7 +13,7 @@ const (
 	authorColumnWidth = 8
 	emptyStateText    = "No messages yet."
 	localAuthor       = "you"
-	systemAuthor      = "system"
+	systemAuthor      = "[system]"
 	unknownAuthor     = "unknown"
 )
 
@@ -34,8 +34,25 @@ type SendRequested struct {
 type QuitRequested struct{}
 
 // ContinueRequested is emitted when a full-screen view asks the session to move
-// forward in the flow: welcome enters dashboard, dashboard enters chat.
+// forward in the flow: welcome enters dashboard, room lists enter chat.
 type ContinueRequested struct{}
+
+// BackRequested asks the session to return to the previous full-screen view.
+type BackRequested struct{}
+
+// DashboardAction identifies which dashboard button was selected.
+type DashboardAction int
+
+const (
+	DashboardActionMyChats DashboardAction = iota
+	DashboardActionManageChats
+	DashboardActionSettings
+)
+
+// DashboardSelectionRequested asks the session to open the selected dashboard area.
+type DashboardSelectionRequested struct {
+	Action DashboardAction
+}
 
 // LeaveRequested is emitted by the chat view when the user chooses to leave the
 // room without quitting the SSH session.
@@ -75,6 +92,16 @@ func requestQuit() tea.Msg {
 
 func requestContinue() tea.Msg {
 	return ContinueRequested{}
+}
+
+func requestBack() tea.Msg {
+	return BackRequested{}
+}
+
+func requestDashboardSelection(action DashboardAction) tea.Cmd {
+	return func() tea.Msg {
+		return DashboardSelectionRequested{Action: action}
+	}
 }
 
 func requestLeave() tea.Msg {

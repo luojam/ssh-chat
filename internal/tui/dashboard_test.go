@@ -106,11 +106,19 @@ func TestDashboardSelectionWraps(t *testing.T) {
 	}
 }
 
-func TestDashboardEnterDoesNotStartChat(t *testing.T) {
+func TestDashboardEnterRequestsSelectedAction(t *testing.T) {
 	m := newDashboardModel(t, Config{Width: 40, Height: 8})
 	_, cmd := m.Update(keySpecial(tea.KeyEnter))
-	if cmd != nil {
-		t.Fatalf("enter command = %T, want nil", cmd())
+	if cmd == nil {
+		t.Fatal("enter should request selected dashboard action")
+	}
+	msg := cmd()
+	selection, ok := msg.(DashboardSelectionRequested)
+	if !ok {
+		t.Fatalf("enter command = %T, want DashboardSelectionRequested", msg)
+	}
+	if selection.Action != DashboardActionMyChats {
+		t.Fatalf("selected action = %d, want %d", selection.Action, DashboardActionMyChats)
 	}
 }
 

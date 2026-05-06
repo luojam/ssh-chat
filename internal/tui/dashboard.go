@@ -43,6 +43,7 @@ const (
 // button belong in the session layer; this view only tracks selection.
 type dashboardItem struct {
 	section dashboardSection
+	action  DashboardAction
 	title   string
 }
 
@@ -112,6 +113,8 @@ func (m *dashboardModel) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		m.selectPrevious()
 	case "right", "l", "tab":
 		m.selectNext()
+	case keySend:
+		return requestDashboardSelection(dashboardItems[m.selectedIndex].action)
 	}
 	return nil
 }
@@ -201,9 +204,9 @@ func (m dashboardModel) renderButtonRow(width int) string {
 }
 
 var dashboardItems = []dashboardItem{
-	{section: dashboardSectionMyChats, title: dashboardMyChatsTitle},
-	{section: dashboardSectionManageChats, title: dashboardManageChatsTitle},
-	{section: dashboardSectionSettings, title: dashboardSettingsTitle},
+	{section: dashboardSectionMyChats, action: DashboardActionMyChats, title: dashboardMyChatsTitle},
+	{section: dashboardSectionManageChats, action: DashboardActionManageChats, title: dashboardManageChatsTitle},
+	{section: dashboardSectionSettings, action: DashboardActionSettings, title: dashboardSettingsTitle},
 }
 
 func newDashboardStyles(isDark bool) dashboardStyles {

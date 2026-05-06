@@ -221,6 +221,73 @@ func TestWelcomeContinueShowsDashboard(t *testing.T) {
 	}
 }
 
+func TestDashboardMyChatsSelectionShowsMyChats(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 12,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterDashboard(t, m)
+
+	next, cmd := m.Update(tui.DashboardSelectionRequested{Action: tui.DashboardActionMyChats})
+	if cmd == nil {
+		t.Fatal("My Chats selection should initialize My Chats view")
+	}
+	m = assertModel(t, next)
+	if m.view != viewMyChats {
+		t.Fatalf("view = %d, want viewMyChats", m.view)
+	}
+	if m.joined || m.subscription != nil {
+		t.Fatal("My Chats view should not join the room")
+	}
+}
+
+func TestBackFromMyChatsReturnsToDashboard(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 12,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterDashboard(t, m)
+	next, _ := m.Update(tui.DashboardSelectionRequested{Action: tui.DashboardActionMyChats})
+	m = assertModel(t, next)
+
+	next, cmd := m.Update(tui.BackRequested{})
+	if cmd == nil {
+		t.Fatal("BackRequested from My Chats should initialize dashboard")
+	}
+	m = assertModel(t, next)
+	if m.view != viewDashboard {
+		t.Fatalf("view = %d, want viewDashboard", m.view)
+	}
+}
+
+func TestContinueFromMyChatsStartsChat(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 12,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterDashboard(t, m)
+	next, _ := m.Update(tui.DashboardSelectionRequested{Action: tui.DashboardActionMyChats})
+	m = assertModel(t, next)
+
+	next, cmd := m.Update(tui.ContinueRequested{})
+	if cmd == nil {
+		t.Fatal("ContinueRequested from My Chats should start chat")
+	}
+	m = assertModel(t, next)
+	if m.view != viewChat {
+		t.Fatalf("view = %d, want viewChat", m.view)
+	}
+	if !m.joined || m.subscription == nil {
+		t.Fatal("model should join selected chat")
+	}
+}
+
 func TestLeaveRequestedReturnsToDashboardAndClosesSubscription(t *testing.T) {
 	room := chat.NewRoom()
 	user := newModel(t, Config{
