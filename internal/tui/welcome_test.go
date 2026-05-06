@@ -26,9 +26,6 @@ func TestWelcomeViewUsesFullFrame(t *testing.T) {
 			t.Fatalf("line %d width = %d, want 50", i, got)
 		}
 	}
-	if !strings.Contains(view.Content, welcomeTitleLine) {
-		t.Fatalf("welcome view should include title, got %q", view.Content)
-	}
 	if !strings.Contains(view.Content, welcomeContinueLine) {
 		t.Fatalf("welcome view should include continue hint, got %q", view.Content)
 	}
@@ -43,6 +40,9 @@ func TestWelcomeShowsFullLogoWhenItFits(t *testing.T) {
 	view := m.View()
 	if !strings.Contains(view.Content, welcomeLogoFull[0]) {
 		t.Fatalf("welcome view should include full logo, got %q", view.Content)
+	}
+	if strings.Contains(view.Content, welcomeTitleLine) {
+		t.Fatalf("welcome view should omit title when logo is visible, got %q", view.Content)
 	}
 }
 

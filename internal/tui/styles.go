@@ -21,6 +21,8 @@ const (
 	lightWelcomeBorder   = "8"
 	darkWelcomeTitle     = "10"
 	lightWelcomeTitle    = "2"
+	darkWelcomeLogo      = "10"
+	lightWelcomeLogo     = "2"
 	darkWelcomePrimary   = "15"
 	lightWelcomePrimary  = "0"
 )
@@ -37,6 +39,7 @@ type styles struct {
 	inputSep         lipgloss.Style
 	welcomeBox       lipgloss.Style
 	welcomeTitle     lipgloss.Style
+	welcomeLogo      lipgloss.Style
 	welcomePrimary   lipgloss.Style
 	welcomeSecondary lipgloss.Style
 }
@@ -50,8 +53,9 @@ func newStyles(isDark bool) styles {
 		systemAuthor:     lipgloss.NewStyle().Foreground(lipgloss.Color(systemAuthorColor)).Bold(true),
 		composer:         lipgloss.NewStyle(),
 		inputSep:         lipgloss.NewStyle().Foreground(lipgloss.Color(composerSepColor)).Faint(true),
-		welcomeBox:       lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2).Align(lipgloss.Center),
+		welcomeBox:       lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(2, 2).Align(lipgloss.Center),
 		welcomeTitle:     lipgloss.NewStyle().Bold(true),
+		welcomeLogo:      lipgloss.NewStyle().Bold(true),
 		welcomePrimary:   lipgloss.NewStyle().Bold(true),
 		welcomeSecondary: lipgloss.NewStyle().Faint(true),
 	}
@@ -61,6 +65,7 @@ func newStyles(isDark bool) styles {
 		s.body = lipgloss.NewStyle().Foreground(lipgloss.Color(darkBodyColor))
 		s.welcomeBox = s.welcomeBox.BorderForeground(lipgloss.Color(darkWelcomeBorder))
 		s.welcomeTitle = s.welcomeTitle.Foreground(lipgloss.Color(darkWelcomeTitle))
+		s.welcomeLogo = s.welcomeLogo.Foreground(lipgloss.Color(darkWelcomeLogo))
 		s.welcomePrimary = s.welcomePrimary.Foreground(lipgloss.Color(darkWelcomePrimary))
 		return s
 	}
@@ -69,6 +74,7 @@ func newStyles(isDark bool) styles {
 	s.body = lipgloss.NewStyle()
 	s.welcomeBox = s.welcomeBox.BorderForeground(lipgloss.Color(lightWelcomeBorder))
 	s.welcomeTitle = s.welcomeTitle.Foreground(lipgloss.Color(lightWelcomeTitle))
+	s.welcomeLogo = s.welcomeLogo.Foreground(lipgloss.Color(lightWelcomeLogo))
 	s.welcomePrimary = s.welcomePrimary.Foreground(lipgloss.Color(lightWelcomePrimary))
 	return s
 }
