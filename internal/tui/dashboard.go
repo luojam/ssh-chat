@@ -19,11 +19,6 @@ const (
 	dashboardFramePaddingX    = 2
 	dashboardFramePaddingY    = 1
 	dashboardButtonGap        = 3
-	dashboardBorderColor      = "62"
-	dashboardSelectedButtonBg = "63"
-	dashboardSelectedButtonFg = "15"
-	dashboardInactiveButtonFg = "250"
-	dashboardHeaderColor      = "14"
 )
 
 var dashboardHeaderLines = []string{
@@ -45,14 +40,6 @@ type dashboardItem struct {
 	section dashboardSection
 	action  DashboardAction
 	title   string
-}
-
-type dashboardStyles struct {
-	box            lipgloss.Style
-	heading        lipgloss.Style
-	hint           lipgloss.Style
-	button         lipgloss.Style
-	selectedButton lipgloss.Style
 }
 
 type dashboardLayout struct {
@@ -207,44 +194,6 @@ var dashboardItems = []dashboardItem{
 	{section: dashboardSectionMyChats, action: DashboardActionMyChats, title: dashboardMyChatsTitle},
 	{section: dashboardSectionManageChats, action: DashboardActionManageChats, title: dashboardManageChatsTitle},
 	{section: dashboardSectionSettings, action: DashboardActionSettings, title: dashboardSettingsTitle},
-}
-
-func newDashboardStyles(isDark bool) dashboardStyles {
-	borderColor := lipgloss.Color(dashboardBorderColor)
-	selectedForeground := lipgloss.Color(dashboardSelectedButtonFg)
-	selectedBackground := lipgloss.Color(dashboardSelectedButtonBg)
-	inactiveForeground := lipgloss.Color(dashboardInactiveButtonFg)
-	if !isDark {
-		borderColor = lipgloss.Color(lightWelcomeBorder)
-		selectedForeground = lipgloss.Color("0")
-		selectedBackground = lipgloss.Color("159")
-		inactiveForeground = lipgloss.Color("255")
-	}
-
-	box := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		Padding(2, 3).
-		BorderForeground(borderColor)
-
-	button := lipgloss.NewStyle().
-		Foreground(inactiveForeground).
-		Padding(0, 2).
-		MarginRight(dashboardButtonGap)
-
-	selectedButton := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(selectedForeground).
-		Background(selectedBackground).
-		Padding(0, 2).
-		MarginRight(dashboardButtonGap)
-
-	return dashboardStyles{
-		box:            box,
-		heading:        lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(dashboardHeaderColor)),
-		hint:           lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color(dashboardInactiveButtonFg)),
-		button:         button,
-		selectedButton: selectedButton,
-	}
 }
 
 // dashboardLayoutFor keeps sizing logic centralized so render output and tests

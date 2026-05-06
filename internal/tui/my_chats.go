@@ -18,8 +18,6 @@ const (
 	myChatsContainerPadY   = 1
 )
 
-var chatListBorderStyle = lipgloss.NewStyle()
-
 type chatRoomItem struct {
 	title string
 }
@@ -29,11 +27,13 @@ func (i chatRoomItem) Description() string { return "" }
 func (i chatRoomItem) FilterValue() string { return i.title }
 
 func NewMyChats(config Config) tea.Model {
+	styles := newMyChatsStyles(true)
 	m := myChatsModel{
 		width:  config.Width,
 		height: config.Height,
 		isDark: true,
-		list:   newMyChatsList(true),
+		styles: styles,
+		list:   newMyChatsList(styles),
 	}
 	m.resize(config.Width, config.Height)
 	return m
@@ -44,7 +44,8 @@ type myChatsModel struct {
 	height int
 	isDark bool
 
-	list list.Model
+	styles myChatsStyles
+	list   list.Model
 }
 
 func (m myChatsModel) Init() tea.Cmd {
@@ -84,24 +85,25 @@ func (m *myChatsModel) setDark(isDark bool) {
 		return
 	}
 	m.isDark = isDark
-	m.list.SetDelegate(newMyChatsDelegate(isDark))
-	m.list.Styles = myChatsListStyles(isDark, m.list.Width())
+	m.styles = newMyChatsStyles(isDark)
+	m.list.SetDelegate(m.styles.listDelegate())
+	m.list.Styles = m.styles.listStyles(m.list.Width())
 }
 
 func (m *myChatsModel) resize(width, height int) {
 	m.width = width
 	m.height = height
 
-	layout := myChatsLayoutFor(width, height)
+	layout := myChatsLayoutFor(width, height, m.styles)
 	listHeight := max(1, layout.listContent.height)
 	m.list.SetSize(layout.listContent.width, listHeight)
-	m.list.Styles = myChatsListStyles(m.isDark, layout.listContent.width)
+	m.list.Styles = m.styles.listStyles(layout.listContent.width)
 }
 
 func (m myChatsModel) render() string {
-	layout := myChatsLayoutFor(m.width, m.height)
+	layout := myChatsLayoutFor(m.width, m.height, m.styles)
 	listHeight := max(1, layout.listContent.height)
-	listBox := chatListBorderStyle.
+	listBox := m.styles.listBorder.
 		Width(layout.listBox.width).
 		Height(layout.listBox.height).
 		Render(fitBlockHeight(m.list.View(), listHeight))
@@ -115,11 +117,9 @@ func (m myChatsModel) render() string {
 		lipgloss.Left,
 		centeredListBox,
 		"",
-		lipgloss.NewStyle().
+		m.styles.hint.
 			Width(layout.content.width).
 			Align(lipgloss.Center).
-			Faint(true).
-			Foreground(lipgloss.Color(dashboardInactiveButtonFg)).
 			Render(chatListHintLine),
 	)
 
@@ -135,10 +135,10 @@ func (m myChatsModel) render() string {
 		Render(container)
 }
 
-func newMyChatsList(isDark bool) list.Model {
-	l := list.New(myChatRoomItems(), newMyChatsDelegate(isDark), 1, 1)
+func newMyChatsList(styles myChatsStyles) list.Model {
+	l := list.New(myChatRoomItems(), styles.listDelegate(), 1, 1)
 	l.Title = chatListTitle
-	l.Styles = myChatsListStyles(isDark, 1)
+	l.Styles = styles.listStyles(1)
 	l.SetFilteringEnabled(false)
 	l.SetShowFilter(false)
 	l.SetShowHelp(false)
@@ -155,34 +155,6 @@ func myChatRoomItems() []list.Item {
 	}
 }
 
-func newMyChatsDelegate(isDark bool) list.DefaultDelegate {
-	delegate := list.NewDefaultDelegate()
-	delegate.Styles = list.NewDefaultItemStyles(isDark)
-	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.
-		BorderLeft(true).
-		BorderStyle(lipgloss.Border{Left: "→"}).BorderForeground(lipgloss.Color("2"))
-	delegate.ShowDescription = false
-	return delegate
-}
-
-func myChatsListStyles(isDark bool, width int) list.Styles {
-	styles := list.DefaultStyles(isDark)
-	width = safeDimension(width)
-	// The default list title bar has left padding, which makes a centered title
-	// look slightly right-shifted inside our bordered list. Center the title bar
-	// itself and keep the title style content-sized.
-	styles.TitleBar = styles.TitleBar.
-		Padding(0, 0, 1, 0).
-		Width(width).
-		Align(lipgloss.Center)
-	styles.Title = styles.Title.
-		Foreground(lipgloss.Color(dashboardHeaderColor)).
-		Bold(true).
-		UnsetBackground().
-		Padding(0, 0)
-	return styles
-}
-
 type myChatsLayout struct {
 	frame       frameSize
 	container   frameSize
@@ -191,7 +163,7 @@ type myChatsLayout struct {
 	listContent frameSize
 }
 
-func myChatsLayoutFor(width, height int) myChatsLayout {
+func myChatsLayoutFor(width, height int, styles myChatsStyles) myChatsLayout {
 	frame := safeFrameSize(width, height)
 	container := myChatsContainerSize(frame)
 	content := frameSize{
@@ -203,8 +175,8 @@ func myChatsLayoutFor(width, height int) myChatsLayout {
 		height: max(1, content.height-2), // spacer plus hint line below the list.
 	}
 	listContent := frameSize{
-		width:  max(1, listBox.width-chatListBorderStyle.GetHorizontalFrameSize()),
-		height: max(1, listBox.height-chatListBorderStyle.GetVerticalFrameSize()),
+		width:  max(1, listBox.width-styles.listBorder.GetHorizontalFrameSize()),
+		height: max(1, listBox.height-styles.listBorder.GetVerticalFrameSize()),
 	}
 
 	return myChatsLayout{
