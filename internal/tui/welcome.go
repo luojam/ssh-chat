@@ -46,9 +46,7 @@ var welcomeLogoStacked = []string{
 
 func NewWelcome(config Config) tea.Model {
 	m := welcomeModel{
-		width:      config.Width,
-		height:     config.Height,
-		isDark:     true,
+		screen:     newScreenState(config),
 		styles:     newStyles(true),
 		initialCmd: nil,
 	}
@@ -57,9 +55,7 @@ func NewWelcome(config Config) tea.Model {
 }
 
 type welcomeModel struct {
-	width  int
-	height int
-	isDark bool
+	screen screenState
 
 	styles styles
 
@@ -67,13 +63,11 @@ type welcomeModel struct {
 }
 
 func (m welcomeModel) Init() tea.Cmd {
-	return tea.Batch(tea.RequestBackgroundColor, m.initialCmd)
+	return screenInit(m.initialCmd)
 }
 
 func (m welcomeModel) View() tea.View {
-	v := tea.NewView(m.render())
-	v.AltScreen = true
-	return v
+	return fullScreenView(m.render())
 }
 
 func (m welcomeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -95,20 +89,18 @@ func (m welcomeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *welcomeModel) setDark(isDark bool) {
-	if m.isDark == isDark {
+	if !m.screen.setDark(isDark) {
 		return
 	}
-	m.isDark = isDark
 	m.styles = newStyles(isDark)
 }
 
 func (m *welcomeModel) resize(width, height int) {
-	m.width = width
-	m.height = height
+	m.screen.resize(width, height)
 }
 
 func (m welcomeModel) render() string {
-	frame := safeFrameSize(m.width, m.height)
+	frame := m.screen.frame()
 	boxW := m.welcomeBoxWidth(frame.width, frame.height)
 
 	box := m.renderWelcomeBox(boxW, frame.height)

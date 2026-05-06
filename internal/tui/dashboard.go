@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	dashboardHeadingLine      = "Dashboard"
+	dashboardHeadingLine      = "MENU"
 	dashboardMyChatsTitle     = "My Chats"
 	dashboardManageChatsTitle = "+/-"
 	dashboardSettingsTitle    = "Settings"
@@ -50,9 +50,7 @@ type dashboardLayout struct {
 
 func NewDashboard(config Config) tea.Model {
 	m := dashboardModel{
-		width:         config.Width,
-		height:        config.Height,
-		isDark:        true,
+		screen:        newScreenState(config),
 		styles:        newDashboardStyles(true),
 		selectedIndex: 0,
 	}
@@ -61,22 +59,18 @@ func NewDashboard(config Config) tea.Model {
 }
 
 type dashboardModel struct {
-	width  int
-	height int
-	isDark bool
+	screen screenState
 
 	styles        dashboardStyles
 	selectedIndex int
 }
 
 func (m dashboardModel) Init() tea.Cmd {
-	return tea.RequestBackgroundColor
+	return screenInit()
 }
 
 func (m dashboardModel) View() tea.View {
-	v := tea.NewView(m.render())
-	v.AltScreen = true
-	return v
+	return fullScreenView(m.render())
 }
 
 func (m dashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -115,22 +109,20 @@ func (m *dashboardModel) selectNext() {
 }
 
 func (m *dashboardModel) setDark(isDark bool) {
-	if m.isDark == isDark {
+	if !m.screen.setDark(isDark) {
 		return
 	}
 
-	m.isDark = isDark
 	m.styles = newDashboardStyles(isDark)
-	m.resize(m.width, m.height)
+	m.resize(m.screen.width, m.screen.height)
 }
 
 func (m *dashboardModel) resize(width, height int) {
-	m.width = width
-	m.height = height
+	m.screen.resize(width, height)
 }
 
 func (m dashboardModel) render() string {
-	layout := dashboardLayoutFor(m.width, m.height, m.styles)
+	layout := dashboardLayoutFor(m.screen.width, m.screen.height, m.styles)
 
 	return lipgloss.NewStyle().
 		Width(layout.frame.width).

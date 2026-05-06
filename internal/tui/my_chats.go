@@ -29,9 +29,7 @@ func (i chatRoomItem) FilterValue() string { return i.title }
 func NewMyChats(config Config) tea.Model {
 	styles := newMyChatsStyles(true)
 	m := myChatsModel{
-		width:  config.Width,
-		height: config.Height,
-		isDark: true,
+		screen: newScreenState(config),
 		styles: styles,
 		list:   newMyChatsList(styles),
 	}
@@ -40,22 +38,18 @@ func NewMyChats(config Config) tea.Model {
 }
 
 type myChatsModel struct {
-	width  int
-	height int
-	isDark bool
+	screen screenState
 
 	styles myChatsStyles
 	list   list.Model
 }
 
 func (m myChatsModel) Init() tea.Cmd {
-	return tea.RequestBackgroundColor
+	return screenInit()
 }
 
 func (m myChatsModel) View() tea.View {
-	v := tea.NewView(m.render())
-	v.AltScreen = true
-	return v
+	return fullScreenView(m.render())
 }
 
 func (m myChatsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -81,18 +75,16 @@ func (m myChatsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *myChatsModel) setDark(isDark bool) {
-	if m.isDark == isDark {
+	if !m.screen.setDark(isDark) {
 		return
 	}
-	m.isDark = isDark
 	m.styles = newMyChatsStyles(isDark)
 	m.list.SetDelegate(m.styles.listDelegate())
 	m.list.Styles = m.styles.listStyles(m.list.Width())
 }
 
 func (m *myChatsModel) resize(width, height int) {
-	m.width = width
-	m.height = height
+	m.screen.resize(width, height)
 
 	layout := myChatsLayoutFor(width, height, m.styles)
 	listHeight := max(1, layout.listContent.height)
@@ -101,7 +93,7 @@ func (m *myChatsModel) resize(width, height int) {
 }
 
 func (m myChatsModel) render() string {
-	layout := myChatsLayoutFor(m.width, m.height, m.styles)
+	layout := myChatsLayoutFor(m.screen.width, m.screen.height, m.styles)
 	listHeight := max(1, layout.listContent.height)
 	listBox := m.styles.listBorder.
 		Width(layout.listBox.width).

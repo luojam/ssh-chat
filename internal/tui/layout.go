@@ -26,11 +26,11 @@ func safeFrameSize(width, height int) frameSize {
 }
 
 func (m model) frameWidth() int {
-	return safeDimension(m.width)
+	return safeDimension(m.screen.width)
 }
 
 func (m model) layout() chatLayout {
-	return chatLayoutFor(m.width, m.height)
+	return chatLayoutFor(m.screen.width, m.screen.height)
 }
 
 func chatLayoutFor(width, height int) chatLayout {

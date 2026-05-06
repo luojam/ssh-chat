@@ -23,9 +23,7 @@ func New(config Config) tea.Model {
 	input, focusCmd := newComposer(true)
 
 	m := model{
-		width:      config.Width,
-		height:     config.Height,
-		isDark:     true,
+		screen:     newScreenState(config),
 		styles:     newStyles(true),
 		input:      input,
 		viewport:   newMessageViewport(),
@@ -36,9 +34,7 @@ func New(config Config) tea.Model {
 }
 
 type model struct {
-	width  int
-	height int
-	isDark bool
+	screen screenState
 
 	styles   styles
 	input    textinput.Model
@@ -49,13 +45,11 @@ type model struct {
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(tea.RequestBackgroundColor, m.initialCmd)
+	return screenInit(m.initialCmd)
 }
 
 func (m model) View() tea.View {
-	v := tea.NewView(m.render())
-	v.AltScreen = true
-	return v
+	return fullScreenView(m.render())
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -91,19 +85,17 @@ func (m *model) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 }
 
 func (m *model) setDark(isDark bool) {
-	if m.isDark == isDark {
+	if !m.screen.setDark(isDark) {
 		return
 	}
 
-	m.isDark = isDark
 	m.styles = newStyles(isDark)
 	m.input.SetStyles(inputStyles(isDark))
 	m.syncMessageViewport(false)
 }
 
 func (m *model) resize(width, height int) {
-	m.width = width
-	m.height = height
+	m.screen.resize(width, height)
 
 	m.syncComposer()
 	m.syncMessageViewport(false)

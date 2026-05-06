@@ -58,7 +58,7 @@ func TestDashboardViewIncludesButtons(t *testing.T) {
 
 func TestDashboardBoxAlmostFillsSmallFrame(t *testing.T) {
 	m := newDashboardModel(t, Config{Width: 20, Height: 8})
-	box := dashboardBoxSize(safeFrameSize(m.width, m.height), m.styles.box)
+	box := dashboardBoxSize(m.screen.frame(), m.styles.box)
 
 	if got, want := box.width, 16; got != want {
 		t.Fatalf("box width = %d, want %d", got, want)
@@ -70,7 +70,7 @@ func TestDashboardBoxAlmostFillsSmallFrame(t *testing.T) {
 
 func TestDashboardBoxIsCenteredContainerOnLargeFrame(t *testing.T) {
 	m := newDashboardModel(t, Config{Width: 100, Height: 30})
-	layout := dashboardLayoutFor(m.width, m.height, m.styles)
+	layout := dashboardLayoutFor(m.screen.width, m.screen.height, m.styles)
 
 	if got, want := layout.box.width, dashboardTargetBoxWidth; got != want {
 		t.Fatalf("box width = %d, want %d", got, want)
