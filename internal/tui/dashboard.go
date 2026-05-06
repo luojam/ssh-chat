@@ -10,8 +10,11 @@ import (
 )
 
 const (
-	dashboardTitleLine       = "MENU"
-	dashboardTownSquareTitle = "My Chats"
+	dashboardMenuTitleLine   = "MENU"
+	dashboardMyChatsTitle    = "My Chats"
+	dashboardCreateChatTitle = "Create chat"
+	dashboardJoinChatTitle   = "Join chat"
+	dashboardSettingsTitle   = "Settings"
 
 	dashboardFramePaddingX  = 2
 	dashboardFramePaddingY  = 1
@@ -19,10 +22,20 @@ const (
 	dashboardNavMinWidth    = 12
 )
 
+type dashboardSection int
+
+const (
+	dashboardSectionMyChats dashboardSection = iota
+	dashboardSectionCreateChat
+	dashboardSectionJoinChat
+	dashboardSectionSettings
+)
+
 // dashboardItem is presentation data only. Application actions for a selected
-// row belong in the session layer; this view emits only navigation intent.
+// row belong in the session layer; this view only tracks selection.
 type dashboardItem struct {
-	title string
+	section dashboardSection
+	title   string
 }
 
 func (i dashboardItem) Title() string       { return i.title }
@@ -96,8 +109,6 @@ func (m *dashboardModel) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	switch msg.String() {
 	case keyQuitCtrlC, keyQuitEsc:
 		return true, requestQuit
-	case keySend:
-		return true, requestContinue
 	default:
 		return false, nil
 	}
@@ -167,7 +178,7 @@ func (m dashboardModel) renderDashboardPanel(layout dashboardLayout) string {
 }
 
 func (m dashboardModel) renderSelectedDashboardPanel(width int) string {
-	title := dashboardTownSquareTitle
+	title := dashboardMyChatsTitle
 	if item, ok := m.list.SelectedItem().(dashboardItem); ok && item.title != "" {
 		title = item.title
 	}
@@ -182,7 +193,7 @@ func newDashboardList(isDark bool) list.Model {
 	delegate := newDashboardDelegate(isDark)
 
 	l := list.New(dashboardItems(), delegate, 1, 1)
-	l.Title = dashboardTitleLine
+	l.Title = dashboardMenuTitleLine
 	l.Styles = dashboardListStyles(isDark, 1)
 	l.SetFilteringEnabled(false)
 	l.SetShowFilter(false)
@@ -195,9 +206,18 @@ func newDashboardList(isDark bool) list.Model {
 }
 
 func dashboardItems() []list.Item {
-	return []list.Item{
-		dashboardItem{title: dashboardTownSquareTitle},
+	items := make([]list.Item, 0, len(dashboardNavItems))
+	for _, item := range dashboardNavItems {
+		items = append(items, item)
 	}
+	return items
+}
+
+var dashboardNavItems = []dashboardItem{
+	{section: dashboardSectionMyChats, title: dashboardMyChatsTitle},
+	{section: dashboardSectionCreateChat, title: dashboardCreateChatTitle},
+	{section: dashboardSectionJoinChat, title: dashboardJoinChatTitle},
+	{section: dashboardSectionSettings, title: dashboardSettingsTitle},
 }
 
 func newDashboardDelegate(isDark bool) list.DefaultDelegate {

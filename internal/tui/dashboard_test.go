@@ -25,17 +25,17 @@ func TestDashboardViewUsesFullFrame(t *testing.T) {
 			t.Fatalf("line %d width = %d, want 50", i, got)
 		}
 	}
-	if !strings.Contains(view.Content, dashboardTitleLine) {
+	if !strings.Contains(view.Content, dashboardMenuTitleLine) {
 		t.Fatalf("dashboard view should include title, got %q", view.Content)
 	}
 }
 
-func TestDashboardViewIncludesOnlyActionableItems(t *testing.T) {
+func TestDashboardViewIncludesNavItems(t *testing.T) {
 	m := newDashboardModel(t, Config{Width: 50, Height: 20})
 	view := m.View()
 
 	items := m.list.Items()
-	if got, want := len(items), 1; got != want {
+	if got, want := len(items), 4; got != want {
 		t.Fatalf("dashboard item count = %d, want %d", got, want)
 	}
 
@@ -43,8 +43,11 @@ func TestDashboardViewIncludesOnlyActionableItems(t *testing.T) {
 	if !ok {
 		t.Fatalf("first dashboard item has type %T, want dashboardItem", items[0])
 	}
-	if first.title != dashboardTownSquareTitle {
-		t.Fatalf("first dashboard item title = %q, want %q", first.title, dashboardTownSquareTitle)
+	if first.section != dashboardSectionMyChats {
+		t.Fatalf("first dashboard item section = %d, want %d", first.section, dashboardSectionMyChats)
+	}
+	if first.title != dashboardMyChatsTitle {
+		t.Fatalf("first dashboard item title = %q, want %q", first.title, dashboardMyChatsTitle)
 	}
 	if !strings.Contains(view.Content, first.title) {
 		t.Fatalf("dashboard view should include first item, got %q", view.Content)
@@ -80,15 +83,11 @@ func TestDashboardLayoutSplitsNarrowNavFromPanel(t *testing.T) {
 	}
 }
 
-func TestDashboardEnterRequestsContinue(t *testing.T) {
+func TestDashboardEnterDoesNotStartChat(t *testing.T) {
 	m := newDashboardModel(t, Config{Width: 40, Height: 8})
 	_, cmd := m.Update(keySpecial(tea.KeyEnter))
-	if cmd == nil {
-		t.Fatal("enter should request continue")
-	}
-	msg := cmd()
-	if _, ok := msg.(ContinueRequested); !ok {
-		t.Fatalf("enter command returned %T, want ContinueRequested", msg)
+	if cmd != nil {
+		t.Fatalf("enter command = %T, want nil", cmd())
 	}
 }
 
