@@ -3,67 +3,70 @@ package tui
 import (
 	"strings"
 
-	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
 const (
-	dashboardMenuTitleLine   = "MENU"
-	dashboardMyChatsTitle    = "My Chats"
-	dashboardCreateChatTitle = "Create chat"
-	dashboardJoinChatTitle   = "Join chat"
-	dashboardSettingsTitle   = "Settings"
-
-	dashboardFramePaddingX  = 2
-	dashboardFramePaddingY  = 1
-	dashboardNavTargetWidth = 22
-	dashboardNavMinWidth    = 12
+	dashboardHeadingLine      = "Dashboard"
+	dashboardMyChatsTitle     = "My Chats"
+	dashboardManageChatsTitle = "+/-"
+	dashboardSettingsTitle    = "Settings"
+	dashboardHintLine         = "←/→ move • enter select • esc exit"
+	dashboardTargetBoxWidth   = 56
+	dashboardTargetBoxHeight  = 12
+	dashboardFramePaddingX    = 2
+	dashboardFramePaddingY    = 1
+	dashboardButtonGap        = 3
+	dashboardBorderColor      = "62"
+	dashboardSelectedButtonBg = "63"
+	dashboardSelectedButtonFg = "15"
+	dashboardInactiveButtonFg = "250"
+	dashboardHeaderColor      = "14"
 )
+
+var dashboardHeaderLines = []string{
+	"█▀▄▀█ █▀▀ █▄░█ █░█",
+	"█░▀░█ ██▄ █░▀█ █▄█",
+}
 
 type dashboardSection int
 
 const (
 	dashboardSectionMyChats dashboardSection = iota
-	dashboardSectionCreateChat
-	dashboardSectionJoinChat
+	dashboardSectionManageChats
 	dashboardSectionSettings
 )
 
 // dashboardItem is presentation data only. Application actions for a selected
-// row belong in the session layer; this view only tracks selection.
+// button belong in the session layer; this view only tracks selection.
 type dashboardItem struct {
 	section dashboardSection
 	title   string
 }
 
-func (i dashboardItem) Title() string       { return i.title }
-func (i dashboardItem) Description() string { return "" }
-func (i dashboardItem) FilterValue() string { return i.title }
-
 type dashboardStyles struct {
-	box        lipgloss.Style
-	navPane    lipgloss.Style
-	panelPane  lipgloss.Style
-	panelTitle lipgloss.Style
+	box            lipgloss.Style
+	heading        lipgloss.Style
+	hint           lipgloss.Style
+	button         lipgloss.Style
+	selectedButton lipgloss.Style
 }
 
 type dashboardLayout struct {
 	frame   frameSize
 	box     frameSize
 	content frameSize
-	nav     frameSize
-	panel   frameSize
 }
 
 func NewDashboard(config Config) tea.Model {
 	m := dashboardModel{
-		width:  config.Width,
-		height: config.Height,
-		isDark: true,
-		styles: newDashboardStyles(true),
-		list:   newDashboardList(true),
+		width:         config.Width,
+		height:        config.Height,
+		isDark:        true,
+		styles:        newDashboardStyles(true),
+		selectedIndex: 0,
 	}
 	m.resize(config.Width, config.Height)
 	return m
@@ -74,8 +77,8 @@ type dashboardModel struct {
 	height int
 	isDark bool
 
-	styles dashboardStyles
-	list   list.Model
+	styles        dashboardStyles
+	selectedIndex int
 }
 
 func (m dashboardModel) Init() tea.Cmd {
@@ -95,23 +98,30 @@ func (m dashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.resize(msg.Width, msg.Height)
 	case tea.KeyPressMsg:
-		if handled, cmd := m.handleKeyPress(msg); handled {
-			return m, cmd
-		}
+		return m, m.handleKeyPress(msg)
 	}
 
-	var cmd tea.Cmd
-	m.list, cmd = m.list.Update(msg)
-	return m, cmd
+	return m, nil
 }
 
-func (m *dashboardModel) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+func (m *dashboardModel) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
 	case keyQuitCtrlC, keyQuitEsc:
-		return true, requestQuit
-	default:
-		return false, nil
+		return requestQuit
+	case "left", "h":
+		m.selectPrevious()
+	case "right", "l", "tab":
+		m.selectNext()
 	}
+	return nil
+}
+
+func (m *dashboardModel) selectPrevious() {
+	m.selectedIndex = (m.selectedIndex - 1 + len(dashboardItems)) % len(dashboardItems)
+}
+
+func (m *dashboardModel) selectNext() {
+	m.selectedIndex = (m.selectedIndex + 1) % len(dashboardItems)
 }
 
 func (m *dashboardModel) setDark(isDark bool) {
@@ -121,18 +131,12 @@ func (m *dashboardModel) setDark(isDark bool) {
 
 	m.isDark = isDark
 	m.styles = newDashboardStyles(isDark)
-	m.list.SetDelegate(newDashboardDelegate(isDark))
 	m.resize(m.width, m.height)
 }
 
 func (m *dashboardModel) resize(width, height int) {
 	m.width = width
 	m.height = height
-
-	layout := dashboardLayoutFor(width, height, m.styles)
-	navContent := dashboardPaneContentSize(layout.nav, m.styles.navPane)
-	m.list.SetSize(navContent.width, navContent.height)
-	m.list.Styles = dashboardListStyles(m.isDark, navContent.width)
 }
 
 func (m dashboardModel) render() string {
@@ -146,11 +150,20 @@ func (m dashboardModel) render() string {
 }
 
 func (m dashboardModel) renderDashboardBox(layout dashboardLayout) string {
-	content := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		m.renderDashboardNav(layout),
-		m.renderDashboardPanel(layout),
+	content := lipgloss.JoinVertical(
+		lipgloss.Center,
+		m.renderDashboardHeader(layout.content.width),
+		"",
+		m.renderButtonRow(layout.content.width),
+		"",
+		m.renderDashboardHint(layout.content.width),
 	)
+
+	content = lipgloss.NewStyle().
+		Width(layout.content.width).
+		Height(layout.content.height).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render(fitBlockHeight(content, layout.content.height))
 
 	return m.styles.box.
 		Width(layout.box.width).
@@ -158,116 +171,81 @@ func (m dashboardModel) renderDashboardBox(layout dashboardLayout) string {
 		Render(content)
 }
 
-func (m dashboardModel) renderDashboardNav(layout dashboardLayout) string {
-	navContent := dashboardPaneContentSize(layout.nav, m.styles.navPane)
-	return m.styles.navPane.
-		Width(layout.nav.width).
-		Height(layout.nav.height).
-		Render(fitBlockHeight(m.list.View(), navContent.height))
+func (m dashboardModel) renderDashboardHeader(width int) string {
+	lines := make([]string, len(dashboardHeaderLines))
+	for i, line := range dashboardHeaderLines {
+		lines[i] = m.styles.heading.Render(wrapCenter(ansi.Truncate(line, width, ""), width))
+	}
+	return strings.Join(lines, "\n")
 }
 
-func (m dashboardModel) renderDashboardPanel(layout dashboardLayout) string {
-	contentWidth := max(1, layout.panel.width-m.styles.panelPane.GetHorizontalFrameSize())
-	contentHeight := max(1, layout.panel.height-m.styles.panelPane.GetVerticalFrameSize())
-	content := fitBlockHeight(m.renderSelectedDashboardPanel(contentWidth), contentHeight)
-
-	return m.styles.panelPane.
-		Width(layout.panel.width).
-		Height(layout.panel.height).
-		Render(content)
+func (m dashboardModel) renderDashboardHint(width int) string {
+	return m.styles.hint.Render(wrapCenter(dashboardHintLine, width))
 }
 
-func (m dashboardModel) renderSelectedDashboardPanel(width int) string {
-	title := dashboardMyChatsTitle
-	if item, ok := m.list.SelectedItem().(dashboardItem); ok && item.title != "" {
-		title = item.title
+func (m dashboardModel) renderButtonRow(width int) string {
+	buttons := make([]string, 0, len(dashboardItems))
+	for i, item := range dashboardItems {
+		style := m.styles.button
+		if i == m.selectedIndex {
+			style = m.styles.selectedButton
+		}
+		buttons = append(buttons, style.Render(item.title))
 	}
 
-	return lipgloss.JoinVertical(
-		lipgloss.Center,
-		m.styles.panelTitle.Render(wrapCenter(ansi.Truncate(title, width, ""), width)),
-	)
+	row := lipgloss.JoinHorizontal(lipgloss.Center, buttons...)
+	return lipgloss.NewStyle().
+		Width(width).
+		Align(lipgloss.Center).
+		Render(row)
 }
 
-func newDashboardList(isDark bool) list.Model {
-	delegate := newDashboardDelegate(isDark)
-
-	l := list.New(dashboardItems(), delegate, 1, 1)
-	l.Title = dashboardMenuTitleLine
-	l.Styles = dashboardListStyles(isDark, 1)
-	l.SetFilteringEnabled(false)
-	l.SetShowFilter(false)
-	l.SetShowHelp(false)
-	l.SetShowPagination(true)
-	l.SetShowStatusBar(false)
-	l.DisableQuitKeybindings()
-
-	return l
-}
-
-func dashboardItems() []list.Item {
-	items := make([]list.Item, 0, len(dashboardNavItems))
-	for _, item := range dashboardNavItems {
-		items = append(items, item)
-	}
-	return items
-}
-
-var dashboardNavItems = []dashboardItem{
+var dashboardItems = []dashboardItem{
 	{section: dashboardSectionMyChats, title: dashboardMyChatsTitle},
-	{section: dashboardSectionCreateChat, title: dashboardCreateChatTitle},
-	{section: dashboardSectionJoinChat, title: dashboardJoinChatTitle},
+	{section: dashboardSectionManageChats, title: dashboardManageChatsTitle},
 	{section: dashboardSectionSettings, title: dashboardSettingsTitle},
 }
 
-func newDashboardDelegate(isDark bool) list.DefaultDelegate {
-	delegate := list.NewDefaultDelegate()
-	delegate.Styles = list.NewDefaultItemStyles(isDark)
-	delegate.SetSpacing(0)
-	delegate.ShowDescription = false
-	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.
-		BorderLeft(true).
-		BorderStyle(lipgloss.Border{
-			Left: ">",
-		})
-	return delegate
-}
-
-func dashboardListStyles(isDark bool, width int) list.Styles {
-	styles := list.DefaultStyles(isDark)
-	width = safeDimension(width)
-	styles.TitleBar = styles.TitleBar.Padding(0, 0, 3, 0).Width(width).Align(lipgloss.Center)
-	return styles
-}
-
 func newDashboardStyles(isDark bool) dashboardStyles {
-	borderColor := lipgloss.Color(darkWelcomeBorder)
+	borderColor := lipgloss.Color(dashboardBorderColor)
+	selectedForeground := lipgloss.Color(dashboardSelectedButtonFg)
+	selectedBackground := lipgloss.Color(dashboardSelectedButtonBg)
+	inactiveForeground := lipgloss.Color(dashboardInactiveButtonFg)
 	if !isDark {
 		borderColor = lipgloss.Color(lightWelcomeBorder)
+		selectedForeground = lipgloss.Color("0")
+		selectedBackground = lipgloss.Color("159")
+		inactiveForeground = lipgloss.Color("255")
 	}
 
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		Padding(1, 2).
+		Padding(2, 3).
 		BorderForeground(borderColor)
 
-	navPane := lipgloss.NewStyle().
-		BorderRight(true).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderRightForeground(borderColor)
+	button := lipgloss.NewStyle().
+		Foreground(inactiveForeground).
+		Padding(0, 2).
+		MarginRight(dashboardButtonGap)
 
-	panelPane := lipgloss.NewStyle().
-		Padding(0, 2)
+	selectedButton := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(selectedForeground).
+		Background(selectedBackground).
+		Padding(0, 2).
+		MarginRight(dashboardButtonGap)
 
 	return dashboardStyles{
-		box:        box,
-		navPane:    navPane,
-		panelPane:  panelPane,
-		panelTitle: lipgloss.NewStyle().Bold(true),
+		box:            box,
+		heading:        lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(dashboardHeaderColor)),
+		hint:           lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color(dashboardInactiveButtonFg)),
+		button:         button,
+		selectedButton: selectedButton,
 	}
 }
 
-// dashboardLayoutFor keeps sizing logic centralized so list sizing matches render output.
+// dashboardLayoutFor keeps sizing logic centralized so render output and tests
+// agree on the centered container dimensions.
 func dashboardLayoutFor(width, height int, styles dashboardStyles) dashboardLayout {
 	frame := safeFrameSize(width, height)
 	box := dashboardBoxSize(frame, styles.box)
@@ -277,54 +255,27 @@ func dashboardLayoutFor(width, height int, styles dashboardStyles) dashboardLayo
 		height: max(1, box.height-styles.box.GetVerticalFrameSize()),
 	}
 
-	navPaneWidth := dashboardNavPaneWidth(content.width, styles.navPane)
-	nav := frameSize{
-		width:  navPaneWidth,
-		height: content.height,
-	}
-	panel := frameSize{
-		width:  max(1, content.width-navPaneWidth),
-		height: content.height,
-	}
-
 	return dashboardLayout{
 		frame:   frame,
 		box:     box,
 		content: content,
-		nav:     nav,
-		panel:   panel,
-	}
-}
-
-func dashboardNavPaneWidth(contentWidth int, style lipgloss.Style) int {
-	contentWidth = safeDimension(contentWidth)
-	if contentWidth <= dashboardNavMinWidth+style.GetHorizontalFrameSize() {
-		return max(1, contentWidth/2)
-	}
-	return min(dashboardNavTargetWidth, max(dashboardNavMinWidth, contentWidth/3))
-}
-
-func dashboardPaneContentSize(pane frameSize, style lipgloss.Style) frameSize {
-	return frameSize{
-		width:  max(1, pane.width-style.GetHorizontalFrameSize()),
-		height: max(1, pane.height-style.GetVerticalFrameSize()),
 	}
 }
 
 func dashboardBoxSize(frame frameSize, style lipgloss.Style) frameSize {
-	width := frame.width
+	maxWidth := frame.width
 	if frame.width > dashboardFramePaddingX*2+style.GetHorizontalFrameSize() {
-		width -= dashboardFramePaddingX * 2
+		maxWidth -= dashboardFramePaddingX * 2
 	}
 
-	height := frame.height
+	maxHeight := frame.height
 	if frame.height > dashboardFramePaddingY*2+style.GetVerticalFrameSize() {
-		height -= dashboardFramePaddingY * 2
+		maxHeight -= dashboardFramePaddingY * 2
 	}
 
 	return frameSize{
-		width:  max(1, width),
-		height: max(1, height),
+		width:  max(1, min(dashboardTargetBoxWidth, maxWidth)),
+		height: max(1, min(dashboardTargetBoxHeight, maxHeight)),
 	}
 }
 
