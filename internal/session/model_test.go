@@ -2,11 +2,13 @@ package session
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/luojam/ssh-chat/internal/auth"
 	"github.com/luojam/ssh-chat/internal/chat"
 	"github.com/luojam/ssh-chat/internal/tui"
 )
@@ -275,6 +277,71 @@ func TestAuthSubmissionShowsMainMenu(t *testing.T) {
 	}
 	if m.subscription != nil {
 		t.Fatal("main menu should not join the room")
+	}
+}
+
+func TestFailedAuthSubmissionStaysOnAuth(t *testing.T) {
+	m := newModel(t, Config{
+		Width:       40,
+		Height:      14,
+		Room:        chat.NewRoom(),
+		Member:      chat.Member{ID: "session-1", Name: "ssh-user"},
+		AuthService: failingAuthService{err: auth.ErrInvalidCredentials},
+	})
+	m = enterAuth(t, m)
+
+	next, cmd := m.Update(tui.AuthSubmissionRequested{Mode: tui.AuthModeLogin, Username: "user", Password: "wrong"})
+	m = assertModel(t, next)
+	if cmd != nil {
+		t.Fatal("failed auth should not navigate or return startup command")
+	}
+	if m.view != viewAuth {
+		t.Fatalf("view = %d, want viewAuth", m.view)
+	}
+	if !strings.Contains(m.View().Content, "Invalid username") {
+		t.Fatalf("auth failure should render error, got %q", m.View().Content)
+	}
+	if m.subscription != nil {
+		t.Fatal("failed auth should not join the room")
+	}
+}
+
+func TestAuthSubmissionStoresAuthenticatedUserAndMember(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "session-1", Name: "ssh-user"},
+	})
+	m = enterAuth(t, m)
+
+	next, _ := m.Update(tui.AuthSubmissionRequested{Mode: tui.AuthModeLogin, Username: "user", Password: "password"})
+	m = assertModel(t, next)
+	if m.authenticatedUser == nil || m.authenticatedUser.Username != "user" {
+		t.Fatalf("authenticated user = %+v, want username user", m.authenticatedUser)
+	}
+	if m.member.ID != "user-auth" || m.member.Name != "user" {
+		t.Fatalf("member = %+v, want authenticated member", m.member)
+	}
+}
+
+func TestSignupSubmissionUsesConfirmPassword(t *testing.T) {
+	authService := recordingAuthService{}
+	m := newModel(t, Config{
+		Width:       40,
+		Height:      8,
+		Room:        chat.NewRoom(),
+		Member:      chat.Member{ID: "session-1", Name: "ssh-user"},
+		AuthService: &authService,
+	})
+	m = enterAuth(t, m)
+
+	_, _ = m.Update(tui.AuthSubmissionRequested{Mode: tui.AuthModeSignup, Username: "user", Password: "password", ConfirmPassword: "password"})
+	if !authService.signupCalled {
+		t.Fatal("signup submission should call Signup")
+	}
+	if authService.confirmPassword != "password" {
+		t.Fatalf("confirm password = %q, want password", authService.confirmPassword)
 	}
 }
 
@@ -570,6 +637,10 @@ func TestWaitForRoomEventClosesSubscriptionOnContextCancel(t *testing.T) {
 func newModel(t *testing.T, config Config) model {
 	t.Helper()
 
+	if config.AuthService == nil {
+		config.AuthService = successfulAuthService{}
+	}
+
 	m, ok := New(config).(model)
 	if !ok {
 		t.Fatalf("New returned %T, want model", m)
@@ -675,7 +746,7 @@ func enterMainMenu(t *testing.T, m model) model {
 	t.Helper()
 
 	m = enterAuth(t, m)
-	next, cmd := m.Update(tui.AuthSubmissionRequested{Mode: tui.AuthModeLogin, Username: "user", Password: "password"})
+	next, cmd := m.Update(tui.AuthSubmissionRequested{Mode: tui.AuthModeLogin, Username: m.member.Name, Password: "password"})
 	if cmd == nil {
 		t.Fatal("auth submission should return main menu startup command")
 	}
@@ -685,4 +756,41 @@ func enterMainMenu(t *testing.T, m model) model {
 		t.Fatalf("view = %d, want viewMainMenu", m.view)
 	}
 	return m
+}
+
+type successfulAuthService struct{}
+
+func (successfulAuthService) Signup(_ context.Context, username, _, _ string) (auth.User, error) {
+	return auth.User{ID: username + "-auth", Username: username}, nil
+}
+
+func (successfulAuthService) Login(_ context.Context, username, _ string) (auth.User, error) {
+	return auth.User{ID: username + "-auth", Username: username}, nil
+}
+
+type failingAuthService struct {
+	err error
+}
+
+func (s failingAuthService) Signup(context.Context, string, string, string) (auth.User, error) {
+	return auth.User{}, s.err
+}
+
+func (s failingAuthService) Login(context.Context, string, string) (auth.User, error) {
+	return auth.User{}, s.err
+}
+
+type recordingAuthService struct {
+	signupCalled    bool
+	confirmPassword string
+}
+
+func (s *recordingAuthService) Signup(_ context.Context, username, _, confirmPassword string) (auth.User, error) {
+	s.signupCalled = true
+	s.confirmPassword = confirmPassword
+	return auth.User{ID: "auth-user", Username: username}, nil
+}
+
+func (s *recordingAuthService) Login(context.Context, string, string) (auth.User, error) {
+	return auth.User{}, errors.New("unexpected login")
 }

@@ -51,10 +51,11 @@ func NewAuth(config Config) tea.Model {
 type authModel struct {
 	screen screenState
 
-	styles     authStyles
-	mode       AuthMode
-	focusIndex int
-	inputs     []textinput.Model
+	styles       authStyles
+	mode         AuthMode
+	focusIndex   int
+	inputs       []textinput.Model
+	errorMessage string
 }
 
 func (m authModel) Init() tea.Cmd {
@@ -71,6 +72,8 @@ func (m authModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setDark(msg.IsDark())
 	case tea.WindowSizeMsg:
 		m.resize(msg.Width, msg.Height)
+	case AuthFailed:
+		m.errorMessage = msg.Message
 	case tea.KeyPressMsg:
 		if handled, cmd := m.handleKeyPress(msg); handled {
 			return m, cmd
@@ -83,6 +86,9 @@ func (m authModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *authModel) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	if msg.String() != keySend {
+		m.errorMessage = ""
+	}
 	switch msg.String() {
 	case keyQuit:
 		return true, requestQuit
@@ -181,14 +187,17 @@ func (m authModel) render() string {
 }
 
 func (m authModel) renderAuthBox(layout authLayout) string {
-	body := lipgloss.JoinVertical(
-		lipgloss.Center,
-		m.renderTabs(layout.content.width), // <-- Tabs
+	sections := []string{
+		m.renderTabs(layout.content.width),
 		"",
-		m.renderFields(layout.content.width), // <-- Input(s)
-		"",
-		m.renderHint(layout.content.width), // <-- Hint
-	)
+		m.renderFields(layout.content.width),
+	}
+	if m.errorMessage != "" {
+		sections = append(sections, "", m.renderError(layout.content.width))
+	}
+	sections = append(sections, "", m.renderHint(layout.content.width))
+
+	body := lipgloss.JoinVertical(lipgloss.Center, sections...)
 
 	content := body
 	if rows := m.topPaddingRows(layout.content.height, body); rows > 0 {
@@ -265,6 +274,10 @@ func authLabelWidth(labels []string) int {
 		width = max(width, lipgloss.Width(label))
 	}
 	return width
+}
+
+func (m authModel) renderError(width int) string {
+	return m.styles.error.Render(wrapCenter(m.errorMessage, width))
 }
 
 func (m authModel) renderHint(width int) string {

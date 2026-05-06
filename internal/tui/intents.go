@@ -30,6 +30,12 @@ type AuthSubmissionRequested struct {
 	ConfirmPassword string
 }
 
+// AuthFailed asks the Auth view to render an authentication error supplied by
+// the Session layer.
+type AuthFailed struct {
+	Message string
+}
+
 // MainMenuAction identifies which main menu button was selected.
 type MainMenuAction int
 

@@ -14,8 +14,9 @@ coverage.*
 go.work
 go.work.sum
 
-# Local SSH host keys
+# Local SSH host keys and app data
 .ssh/
+data/
 
 # Editor and OS files
 .DS_Store

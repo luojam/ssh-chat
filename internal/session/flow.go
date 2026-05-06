@@ -1,7 +1,11 @@
 package session
 
 import (
+	"errors"
+
 	tea "charm.land/bubbletea/v2"
+	"github.com/luojam/ssh-chat/internal/auth"
+	"github.com/luojam/ssh-chat/internal/chat"
 	"github.com/luojam/ssh-chat/internal/tui"
 )
 
@@ -55,13 +59,54 @@ func (m *model) backFromCurrentView() tea.Cmd {
 	}
 }
 
-func (m *model) submitAuth(_ tui.AuthSubmissionRequested) tea.Cmd {
-	if m.view != viewAuth {
+func (m *model) submitAuth(submission tui.AuthSubmissionRequested) tea.Cmd {
+	if m.view != viewAuth || m.authService == nil {
 		return nil
 	}
-	// Real authentication will validate this submission before entering the app.
-	// For now, the auth view is a navigation gate with form collection only.
+
+	user, err := m.authenticate(submission)
+	if err != nil {
+		return m.showAuthError(authErrorMessage(err))
+	}
+
+	m.authenticatedUser = &user
+	m.member.ID = chatMemberID(user.ID)
+	m.member.Name = user.Username
 	return m.showStandaloneView(viewMainMenu)
+}
+
+func (m *model) authenticate(submission tui.AuthSubmissionRequested) (auth.User, error) {
+	switch submission.Mode {
+	case tui.AuthModeSignup:
+		return m.authService.Signup(m.ctx, submission.Username, submission.Password, submission.ConfirmPassword)
+	default:
+		return m.authService.Login(m.ctx, submission.Username, submission.Password)
+	}
+}
+
+func (m *model) showAuthError(message string) tea.Cmd {
+	var cmd tea.Cmd
+	m.ui, cmd = m.ui.Update(tui.AuthFailed{Message: message})
+	return cmd
+}
+
+func authErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, auth.ErrUsernameTaken):
+		return "Username is already taken."
+	case errors.Is(err, auth.ErrPasswordMismatch):
+		return "Passwords do not match."
+	case errors.Is(err, auth.ErrInvalidCredentials):
+		return "Invalid username or password."
+	case errors.Is(err, auth.ErrInvalidInput):
+		return "Username and password are required."
+	default:
+		return "Authentication failed."
+	}
+}
+
+func chatMemberID(userID string) chat.MemberID {
+	return chat.MemberID(userID)
 }
 
 func (m *model) openMainMenuSelection(action tui.MainMenuAction) tea.Cmd {

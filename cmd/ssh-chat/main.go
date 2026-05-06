@@ -18,19 +18,34 @@ import (
 	"charm.land/wish/v2/bubbletea"
 	"charm.land/wish/v2/logging"
 	"github.com/charmbracelet/ssh"
+	"github.com/luojam/ssh-chat/internal/auth"
 	"github.com/luojam/ssh-chat/internal/chat"
 	"github.com/luojam/ssh-chat/internal/session"
+	"github.com/luojam/ssh-chat/internal/storage/sqlite"
 )
 
 const (
-	host          = "localhost"
-	port          = "2222"
-	hostKeyPath   = ".ssh/id_ed25519"
-	defaultMember = "anonymous"
+	host              = "localhost"
+	port              = "2222"
+	hostKeyPath       = ".ssh/id_ed25519"
+	defaultMember     = "anonymous"
+	defaultSQLitePath = "data/ssh-chat.sqlite"
 )
 
 func main() {
 	room := chat.NewRoom()
+
+	if err := os.MkdirAll("data", 0o700); err != nil {
+		log.Error("Could not create data directory", "error", err)
+		return
+	}
+	db, err := sqlite.Open(context.Background(), defaultSQLitePath)
+	if err != nil {
+		log.Error("Could not open SQLite database", "error", err)
+		return
+	}
+	defer db.Close()
+	authService := auth.NewPasswordService(sqlite.NewUserStore(db))
 
 	s, err := wish.NewServer(
 		wish.WithAddress(net.JoinHostPort(host, port)),
@@ -44,7 +59,7 @@ func main() {
 		// terminal, and only then starts one Bubble Tea program for the session.
 		wish.WithMiddleware(
 			bubbletea.Middleware(func(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
-				return teaHandler(sess, room)
+				return teaHandler(sess, room, authService)
 			}),
 			activeterm.Middleware(),
 			logging.Middleware(),
@@ -73,7 +88,7 @@ func main() {
 	}
 }
 
-func teaHandler(sess ssh.Session, room *chat.Room) (tea.Model, []tea.ProgramOption) {
+func teaHandler(sess ssh.Session, room *chat.Room, authService auth.Service) (tea.Model, []tea.ProgramOption) {
 	pty, _, ok := sess.Pty()
 	if !ok {
 		// Wish's active-terminal middleware should reject this earlier, but keeping
@@ -88,10 +103,11 @@ func teaHandler(sess ssh.Session, room *chat.Room) (tea.Model, []tea.ProgramOpti
 	}
 
 	return session.New(session.Config{
-		Width:   pty.Window.Width,
-		Height:  pty.Window.Height,
-		Context: sess.Context(),
-		Room:    room,
+		Width:       pty.Window.Width,
+		Height:      pty.Window.Height,
+		Context:     sess.Context(),
+		Room:        room,
+		AuthService: authService,
 		// Room participant for this connection: new opaque ID each SSH session; display
 		// name from SSH login (see memberName). chat.Member is the shared shape only.
 		Member: chat.Member{

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/luojam/ssh-chat/internal/auth"
 	"github.com/luojam/ssh-chat/internal/chat"
 	"github.com/luojam/ssh-chat/internal/tui"
 )
@@ -22,10 +23,11 @@ const (
 // identity in the room (same type chat uses for authors and join/leave); the transport
 // layer constructs it and passes it in—chat does not infer "current user" by itself.
 type Config struct {
-	Width   int
-	Height  int
-	Context context.Context
-	Room    *chat.Room
+	Width       int
+	Height      int
+	Context     context.Context
+	Room        *chat.Room
+	AuthService auth.Service
 	// Member is who this session joins and posts as; kept on the model to attribute
 	// outgoing messages and to label local Room events for terminal display.
 	Member chat.Member
@@ -38,12 +40,13 @@ func New(config Config) tea.Model {
 	}
 
 	return model{
-		ctx:    ctx,
-		room:   config.Room,
-		member: config.Member,
-		width:  config.Width,
-		height: config.Height,
-		view:   viewWelcome,
+		ctx:         ctx,
+		room:        config.Room,
+		authService: config.AuthService,
+		member:      config.Member,
+		width:       config.Width,
+		height:      config.Height,
+		view:        viewWelcome,
 		ui: tui.NewWelcome(tui.Config{
 			Width:  config.Width,
 			Height: config.Height,
@@ -52,15 +55,17 @@ func New(config Config) tea.Model {
 }
 
 type model struct {
-	ctx          context.Context
-	room         *chat.Room
-	member       chat.Member // local participant; pairs with Config.Member at construction
-	width        int
-	height       int
-	subscription *chat.Subscription
-	view         viewState
-	closed       bool
-	ui           tea.Model
+	ctx               context.Context
+	room              *chat.Room
+	authService       auth.Service
+	authenticatedUser *auth.User
+	member            chat.Member // local participant; pairs with Config.Member at construction
+	width             int
+	height            int
+	subscription      *chat.Subscription
+	view              viewState
+	closed            bool
+	ui                tea.Model
 }
 
 type roomEvent struct {

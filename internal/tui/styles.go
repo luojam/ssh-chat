@@ -109,6 +109,7 @@ type authStyles struct {
 	label       lipgloss.Style
 	activeLabel lipgloss.Style
 	inputLine   lipgloss.Style
+	error       lipgloss.Style
 	hint        lipgloss.Style
 }
 
@@ -141,6 +142,7 @@ func newAuthStyles(isDark bool) authStyles {
 		label:       lipgloss.NewStyle().Foreground(inactiveForeground),
 		activeLabel: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(composerAccentColor)),
 		inputLine:   lipgloss.NewStyle().Padding(0, 2),
+		error:       lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
 		hint:        lipgloss.NewStyle().Faint(true).Foreground(inactiveForeground),
 	}
 }
