@@ -5,6 +5,8 @@ import (
 	"github.com/luojam/ssh-chat/internal/tui"
 )
 
+const townSquareRoomID = "town-square"
+
 // applyFlowIntent is the Session navigation table. Keeping transitions here
 // concentrates the important invariant: only the Room View may hold a Room
 // Subscription, and leaving that View closes the Subscription before navigation.
@@ -20,6 +22,8 @@ func (m *model) applyFlowIntent(msg tea.Msg) tea.Cmd {
 		return m.backFromCurrentView()
 	case tui.MainMenuSelectionRequested:
 		return m.openMainMenuSelection(msg.Action)
+	case tui.RoomSelected:
+		return m.enterSelectedRoom(msg.RoomID)
 	case tui.LeaveRequested:
 		return m.leaveRoomView()
 	default:
@@ -31,8 +35,6 @@ func (m *model) continueFromCurrentView() tea.Cmd {
 	switch m.view {
 	case viewWelcome:
 		return m.showStandaloneView(viewMainMenu)
-	case viewMyChats:
-		return m.enterRoomView()
 	default:
 		return nil
 	}
@@ -71,6 +73,13 @@ func (m *model) showStandaloneView(view viewState) tea.Cmd {
 	m.view = view
 	m.ui = m.newUI(view)
 	return m.ui.Init()
+}
+
+func (m *model) enterSelectedRoom(roomID string) tea.Cmd {
+	if m.view != viewMyChats || roomID != townSquareRoomID {
+		return nil
+	}
+	return m.enterRoomView()
 }
 
 func (m *model) enterRoomView() tea.Cmd {
@@ -113,6 +122,7 @@ func (m model) newUI(view viewState) tea.Model {
 	case viewMainMenu:
 		return tui.NewMainMenu(config)
 	case viewMyChats:
+		config.Rooms = []tui.RoomListItem{{ID: townSquareRoomID, Title: "Town Square"}}
 		return tui.NewMyChats(config)
 	case viewChat:
 		return tui.NewRoomView(config)

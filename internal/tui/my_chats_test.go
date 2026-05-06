@@ -48,15 +48,19 @@ func TestMyChatsContainerIsCenteredAndConstrained(t *testing.T) {
 	}
 }
 
-func TestMyChatsEnterRequestsContinue(t *testing.T) {
+func TestMyChatsEnterRequestsSelectedRoom(t *testing.T) {
 	m := newMyChatsModel(t, Config{Width: 50, Height: 12})
 
 	_, cmd := m.Update(keySpecial(tea.KeyEnter))
 	if cmd == nil {
-		t.Fatal("enter should request continue")
+		t.Fatal("enter should request selected Room")
 	}
-	if _, ok := cmd().(ContinueRequested); !ok {
-		t.Fatalf("enter command returned %T, want ContinueRequested", cmd())
+	msg, ok := cmd().(RoomSelected)
+	if !ok {
+		t.Fatalf("enter command returned %T, want RoomSelected", cmd())
+	}
+	if msg.RoomID != "town-square" {
+		t.Fatalf("selected Room ID = %q, want town-square", msg.RoomID)
 	}
 }
 
@@ -87,6 +91,9 @@ func TestMyChatsCtrlCRequestsQuit(t *testing.T) {
 func newMyChatsModel(t *testing.T, config Config) myChatsModel {
 	t.Helper()
 
+	if config.Rooms == nil {
+		config.Rooms = []RoomListItem{{ID: "town-square", Title: "Town Square"}}
+	}
 	tm := NewMyChats(config)
 	m, ok := tm.(myChatsModel)
 	if !ok {

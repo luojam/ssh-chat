@@ -81,7 +81,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tui.QuitRequested:
 		m.close()
 		return m, tea.Quit
-	case tui.ContinueRequested, tui.BackRequested, tui.MainMenuSelectionRequested, tui.LeaveRequested:
+	case tui.ContinueRequested, tui.BackRequested, tui.MainMenuSelectionRequested, tui.RoomSelected, tui.LeaveRequested:
 		return m, m.applyFlowIntent(msg)
 	case tui.SendRequested:
 		return m, m.postMessage(msg.Body)

@@ -343,20 +343,62 @@ func TestBackFromMyChatsReturnsToMainMenu(t *testing.T) {
 	}
 }
 
-func TestContinueFromMyChatsStartsChat(t *testing.T) {
+func TestContinueFromMyChatsDoesNotStartChat(t *testing.T) {
 	m := newModel(t, Config{
 		Width:  40,
 		Height: 12,
 		Room:   chat.NewRoom(),
 		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
-	m = enterMainMenu(t, m)
-	next, _ := m.Update(tui.MainMenuSelectionRequested{Action: tui.MainMenuActionMyChats})
-	m = assertModel(t, next)
+	m = enterMyChats(t, m)
 
 	next, cmd := m.Update(tui.ContinueRequested{})
+	if cmd != nil {
+		t.Fatal("ContinueRequested from My Chats should not navigate")
+	}
+	m = assertModel(t, next)
+	if m.view != viewMyChats {
+		t.Fatalf("view = %d, want viewMyChats", m.view)
+	}
+	if m.subscription != nil {
+		t.Fatal("ContinueRequested from My Chats should not join the room")
+	}
+}
+
+func TestUnknownSelectedRoomFromMyChatsDoesNotStartChat(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 12,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterMyChats(t, m)
+
+	next, cmd := m.Update(tui.RoomSelected{RoomID: "unknown-room"})
+	if cmd != nil {
+		t.Fatal("unknown RoomSelected should not navigate")
+	}
+	m = assertModel(t, next)
+	if m.view != viewMyChats {
+		t.Fatalf("view = %d, want viewMyChats", m.view)
+	}
+	if m.subscription != nil {
+		t.Fatal("unknown RoomSelected should not join the room")
+	}
+}
+
+func TestSelectedRoomFromMyChatsStartsChat(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 12,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterMyChats(t, m)
+
+	next, cmd := m.Update(tui.RoomSelected{RoomID: townSquareRoomID})
 	if cmd == nil {
-		t.Fatal("ContinueRequested from My Chats should start the Room View")
+		t.Fatal("RoomSelected from My Chats should start the Room View")
 	}
 	m = assertModel(t, next)
 	if m.view != viewChat {
@@ -538,9 +580,9 @@ func enterChat(t *testing.T, m model) model {
 	t.Helper()
 
 	m = enterMyChats(t, m)
-	next, cmd := m.Update(tui.ContinueRequested{})
+	next, cmd := m.Update(tui.RoomSelected{RoomID: townSquareRoomID})
 	if cmd == nil {
-		t.Fatal("continue from My Chats should return Room View startup command")
+		t.Fatal("RoomSelected from My Chats should return Room View startup command")
 	}
 
 	m = assertModel(t, next)

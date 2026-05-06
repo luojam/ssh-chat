@@ -16,6 +16,12 @@ const (
 type Config struct {
 	Width  int
 	Height int
+	Rooms  []RoomListItem
+}
+
+type RoomListItem struct {
+	ID    string
+	Title string
 }
 
 func NewRoomView(config Config) tea.Model {

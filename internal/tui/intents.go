@@ -13,7 +13,8 @@ type SendRequested struct {
 type QuitRequested struct{}
 
 // ContinueRequested is emitted when a full-screen view asks the session to move
-// forward in the flow: welcome enters main menu, My Chats enters the Room View.
+// forward in the flow without selecting a domain object, such as Welcome entering
+// the Main Menu.
 type ContinueRequested struct{}
 
 // BackRequested asks the session to return to the previous full-screen view.
@@ -31,6 +32,12 @@ const (
 // MainMenuSelectionRequested asks the session to open the selected main menu area.
 type MainMenuSelectionRequested struct {
 	Action MainMenuAction
+}
+
+// RoomSelected asks the session to enter the selected Room. The TUI supplies
+// identity only; Session still owns Room membership lifecycle.
+type RoomSelected struct {
+	RoomID string
 }
 
 // LeaveRequested is emitted by the room view when the user chooses to leave the
@@ -52,6 +59,12 @@ func requestBack() tea.Msg {
 func requestMainMenuSelection(action MainMenuAction) tea.Cmd {
 	return func() tea.Msg {
 		return MainMenuSelectionRequested{Action: action}
+	}
+}
+
+func requestRoomSelection(roomID string) tea.Cmd {
+	return func() tea.Msg {
+		return RoomSelected{RoomID: roomID}
 	}
 }
 

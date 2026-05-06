@@ -19,6 +19,7 @@ const (
 )
 
 type myChatsRoomItem struct {
+	id    string
 	title string
 }
 
@@ -31,7 +32,7 @@ func NewMyChats(config Config) tea.Model {
 	m := myChatsModel{
 		screen: newScreenState(config),
 		styles: styles,
-		list:   newMyChatsList(styles),
+		list:   newMyChatsList(styles, config.Rooms),
 	}
 	m.resize(config.Width, config.Height)
 	return m
@@ -65,7 +66,7 @@ func (m myChatsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case keyBack:
 			return m, requestBack
 		case keySend:
-			return m, requestContinue
+			return m, m.requestSelectedRoom()
 		}
 	}
 
@@ -127,8 +128,16 @@ func (m myChatsModel) render() string {
 		Render(container)
 }
 
-func newMyChatsList(styles myChatsStyles) list.Model {
-	l := list.New(myChatsRoomItems(), styles.listDelegate(), 1, 1)
+func (m myChatsModel) requestSelectedRoom() tea.Cmd {
+	item, ok := m.list.SelectedItem().(myChatsRoomItem)
+	if !ok || item.id == "" {
+		return nil
+	}
+	return requestRoomSelection(item.id)
+}
+
+func newMyChatsList(styles myChatsStyles, rooms []RoomListItem) list.Model {
+	l := list.New(myChatsRoomItems(rooms), styles.listDelegate(), 1, 1)
 	l.Title = myChatsTitle
 	l.Styles = styles.listStyles(1)
 	l.SetFilteringEnabled(false)
@@ -141,11 +150,12 @@ func newMyChatsList(styles myChatsStyles) list.Model {
 	return l
 }
 
-// TODO: These will be fetched from the server
-func myChatsRoomItems() []list.Item {
-	return []list.Item{
-		myChatsRoomItem{title: "Town Square"},
+func myChatsRoomItems(rooms []RoomListItem) []list.Item {
+	items := make([]list.Item, 0, len(rooms))
+	for _, room := range rooms {
+		items = append(items, myChatsRoomItem{id: room.ID, title: room.Title})
 	}
+	return items
 }
 
 type myChatsLayout struct {
