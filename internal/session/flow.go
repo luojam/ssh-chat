@@ -40,6 +40,9 @@ func (m *model) applyFlowIntent(msg tea.Msg) tea.Cmd {
 func (m *model) continueFromCurrentView() tea.Cmd {
 	switch m.view {
 	case viewWelcome:
+		if m.isAuthenticated() {
+			return m.showStandaloneView(viewMainMenu)
+		}
 		return m.showStandaloneView(viewAuth)
 	default:
 		return nil
@@ -51,7 +54,7 @@ func (m *model) backFromCurrentView() tea.Cmd {
 	case viewAuth:
 		return m.showStandaloneView(viewWelcome)
 	case viewMainMenu:
-		return m.showStandaloneView(viewAuth)
+		return m.showStandaloneView(viewWelcome)
 	case viewMyChats:
 		return m.showStandaloneView(viewMainMenu)
 	default:
@@ -126,11 +129,18 @@ func (m *model) showStandaloneView(view viewState) tea.Cmd {
 	if m.closed {
 		return nil
 	}
+	if view == viewAuth && m.isAuthenticated() {
+		view = viewMainMenu
+	}
 
 	m.closeRoomMembership()
 	m.view = view
 	m.ui = m.newUI(view)
 	return m.ui.Init()
+}
+
+func (m model) isAuthenticated() bool {
+	return m.authenticatedUser != nil
 }
 
 func (m *model) enterSelectedRoom(roomID string) tea.Cmd {
