@@ -169,20 +169,29 @@ func TestNewSessionCanRenderRoomHistory(t *testing.T) {
 }
 
 func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
+	room := chat.NewRoom()
 	m := newModel(t, Config{
 		Width:  40,
 		Height: 8,
-		Room:   chat.NewRoom(),
+		Room:   room,
 		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterChat(t, m)
+
+	sara := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   room,
+		Member: chat.Member{ID: "sara-1", Name: "sara"},
+	})
+	_ = enterChat(t, sara)
 
 	event := nextRoomEvent(t, m.subscription, chat.MemberJoined)
 	next, _ := m.Update(roomEvent{event: event})
 	m = assertModel(t, next)
 
 	view := m.View()
-	if !strings.Contains(view.Content, systemAuthor) || !strings.Contains(view.Content, "user joined") {
+	if !strings.Contains(view.Content, systemAuthor) || !strings.Contains(view.Content, "sara joined") {
 		t.Fatalf("join should render as system message, got %q", view.Content)
 	}
 

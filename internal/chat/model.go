@@ -9,8 +9,10 @@ import (
 
 var ErrEmptyMessage = errors.New("empty message")
 
-const subscriptionBuffer = 16
-const historyLimit = subscriptionBuffer
+const (
+	historyLimit       = 16
+	subscriptionBuffer = 16
+)
 
 // MemberID is an opaque room participant identifier. The SSH server assigns a
 // new ID per connection; it is not a durable user account ID unless you add that layer.
@@ -68,7 +70,6 @@ type Room struct {
 
 type subscriber struct {
 	member Member
-	joined bool
 }
 
 func NewRoom() *Room {
@@ -78,25 +79,13 @@ func NewRoom() *Room {
 	}
 }
 
-// Subscribe returns a stream of room events (including a replay of recent message
-// history) but does not register a member. No MemberJoined or MemberLeft events
-// are emitted for this subscription.
-func (r *Room) Subscribe() *Subscription {
-	return r.subscribe(Member{}, false)
-}
-
-// Join is like Subscribe, but associates the subscription with member and announces
-// their presence: all subscribers, including the joining member, receive MemberJoined;
-// remaining subscribers receive MemberLeft when Close runs.
+// Join registers member in the room and returns their event stream. The stream
+// starts with recent message history; existing members are notified that member
+// joined, but the joining member does not receive their own MemberJoined event.
 func (r *Room) Join(member Member) *Subscription {
-	return r.subscribe(member, true)
-}
-
-// subscribe is the shared implementation for Subscribe and Join. The joined flag
-// controls whether this subscription participates in member join/leave broadcasts;
-// member is the identity stored for those events when joined is true.
-func (r *Room) subscribe(member Member, joined bool) *Subscription {
-	events := make(chan Event, subscriptionBuffer)
+	// Capacity includes replay plus live slack so a full history replay never makes
+	// a new member look slow before their session can read its first event.
+	events := make(chan Event, historyLimit+subscriptionBuffer)
 
 	r.mu.Lock()
 	history := r.history()
@@ -106,16 +95,11 @@ func (r *Room) subscribe(member Member, joined bool) *Subscription {
 			Message: msg,
 		}
 	}
-	r.subscribers[events] = subscriber{
-		member: member,
-		joined: joined,
-	}
-	if joined {
-		r.broadcast(Event{
-			Kind:   MemberJoined,
-			Member: member,
-		})
-	}
+	r.broadcast(Event{
+		Kind:   MemberJoined,
+		Member: member,
+	})
+	r.subscribers[events] = subscriber{member: member}
 	r.mu.Unlock()
 
 	return &Subscription{
@@ -130,12 +114,10 @@ func (r *Room) subscribe(member Member, joined bool) *Subscription {
 			}
 			delete(r.subscribers, events)
 			close(events)
-			if subscriber.joined {
-				r.broadcast(Event{
-					Kind:   MemberLeft,
-					Member: subscriber.member,
-				})
-			}
+			r.broadcast(Event{
+				Kind:   MemberLeft,
+				Member: subscriber.member,
+			})
 		},
 	}
 }
