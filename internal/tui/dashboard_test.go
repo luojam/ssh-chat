@@ -63,6 +63,23 @@ func TestDashboardBoxAlmostFillsSmallFrame(t *testing.T) {
 	}
 }
 
+func TestDashboardLayoutSplitsNarrowNavFromPanel(t *testing.T) {
+	m := newDashboardModel(t, Config{Width: 80, Height: 20})
+	layout := dashboardLayoutFor(m.width, m.height, m.styles)
+
+	if layout.nav.width >= layout.panel.width {
+		t.Fatalf("nav width should be narrower than panel: nav=%d panel=%d", layout.nav.width, layout.panel.width)
+	}
+	if got, want := layout.nav.width, dashboardNavTargetWidth; got != want {
+		t.Fatalf("nav width = %d, want %d", got, want)
+	}
+
+	navContent := dashboardPaneContentSize(layout.nav, m.styles.navPane)
+	if got := m.list.Width(); got != navContent.width {
+		t.Fatalf("list width = %d, want nav content width %d", got, navContent.width)
+	}
+}
+
 func TestDashboardEnterRequestsContinue(t *testing.T) {
 	m := newDashboardModel(t, Config{Width: 40, Height: 8})
 	_, cmd := m.Update(keySpecial(tea.KeyEnter))
