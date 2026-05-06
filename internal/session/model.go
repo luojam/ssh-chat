@@ -61,7 +61,6 @@ type model struct {
 	height       int
 	subscription *chat.Subscription
 	view         viewState
-	joined       bool
 	closed       bool
 	ui           tea.Model
 }
@@ -85,18 +84,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tui.QuitRequested:
 		m.close()
 		return m, tea.Quit
-	case tui.ContinueRequested:
-		return m, m.continueFromCurrentView()
-	case tui.BackRequested:
-		return m, m.backFromCurrentView()
-	case tui.MainMenuSelectionRequested:
-		return m, m.openMainMenuSelection(msg.Action)
-	case tui.LeaveRequested:
-		return m, m.leaveChat()
+	case tui.ContinueRequested, tui.BackRequested, tui.MainMenuSelectionRequested, tui.LeaveRequested:
+		return m, m.applyFlowIntent(msg)
 	case tui.SendRequested:
 		return m, m.postMessage(msg.Body)
 	case roomEvent:
-		if m.view != viewChat {
+		if !m.inRoomView() {
 			return m, nil
 		}
 		display, ok := m.displayMessage(msg.event)
@@ -119,7 +112,7 @@ func (m model) View() tea.View {
 
 func (m model) postMessage(body string) tea.Cmd {
 	return func() tea.Msg {
-		if m.closed || !m.joined {
+		if m.closed || !m.inRoomView() {
 			return nil
 		}
 		_, _ = m.room.Post(m.member, body)
@@ -153,111 +146,6 @@ func (m model) waitForRoomEvent() tea.Cmd {
 	}
 }
 
-func (m *model) continueFromCurrentView() tea.Cmd {
-	switch m.view {
-	case viewWelcome:
-		return m.showMainMenu()
-	case viewMainMenu, viewMyChats:
-		return m.startChat()
-	default:
-		return nil
-	}
-}
-
-func (m *model) backFromCurrentView() tea.Cmd {
-	switch m.view {
-	case viewMainMenu:
-		return m.showWelcome()
-	case viewMyChats:
-		return m.showMainMenu()
-	default:
-		return nil
-	}
-}
-
-func (m *model) openMainMenuSelection(action tui.MainMenuAction) tea.Cmd {
-	if m.view != viewMainMenu {
-		return nil
-	}
-
-	switch action {
-	case tui.MainMenuActionMyChats:
-		return m.showMyChats()
-	default:
-		return nil
-	}
-}
-
-func (m *model) showWelcome() tea.Cmd {
-	if m.closed {
-		return nil
-	}
-
-	m.view = viewWelcome
-	m.ui = tui.NewWelcome(tui.Config{
-		Width:  m.width,
-		Height: m.height,
-	})
-	return m.ui.Init()
-}
-
-func (m *model) showMainMenu() tea.Cmd {
-	if m.closed {
-		return nil
-	}
-
-	m.view = viewMainMenu
-	m.ui = tui.NewMainMenu(tui.Config{
-		Width:  m.width,
-		Height: m.height,
-	})
-	return m.ui.Init()
-}
-
-func (m *model) showMyChats() tea.Cmd {
-	if m.closed {
-		return nil
-	}
-
-	m.view = viewMyChats
-	m.ui = tui.NewMyChats(tui.Config{
-		Width:  m.width,
-		Height: m.height,
-	})
-	return m.ui.Init()
-}
-
-func (m *model) startChat() tea.Cmd {
-	if m.closed || m.joined {
-		return nil
-	}
-
-	m.ui = tui.NewRoomView(tui.Config{
-		Width:  m.width,
-		Height: m.height,
-	})
-	m.subscription = m.room.Join(m.member)
-	m.view = viewChat
-	m.joined = true
-
-	return tea.Batch(m.ui.Init(), m.waitForRoomEvent())
-}
-
-// leaveChat is navigation plus membership cleanup. Keeping both together makes
-// the invariant explicit: the main menu view never has an active room subscription.
-func (m *model) leaveChat() tea.Cmd {
-	if m.closed || !m.joined {
-		return nil
-	}
-
-	if m.subscription != nil {
-		m.subscription.Close()
-		m.subscription = nil
-	}
-	m.joined = false
-	return m.showMainMenu()
-}
-
 func (m model) displayMessage(event chat.Event) (tui.MessageReceived, bool) {
 	switch event.Kind {
 	case chat.MessagePosted:
@@ -286,7 +174,5 @@ func (m *model) close() {
 		return
 	}
 	m.closed = true
-	if m.subscription != nil {
-		m.subscription.Close()
-	}
+	m.closeRoomMembership()
 }

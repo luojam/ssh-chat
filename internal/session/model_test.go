@@ -225,7 +225,7 @@ func TestWelcomeContinueShowsMainMenu(t *testing.T) {
 	if m.view != viewMainMenu {
 		t.Fatalf("view = %d, want viewMainMenu", m.view)
 	}
-	if m.joined || m.subscription != nil {
+	if m.subscription != nil {
 		t.Fatal("main menu should not join the room")
 	}
 }
@@ -247,8 +247,30 @@ func TestBackFromMainMenuReturnsToWelcome(t *testing.T) {
 	if m.view != viewWelcome {
 		t.Fatalf("view = %d, want viewWelcome", m.view)
 	}
-	if m.joined || m.subscription != nil {
+	if m.subscription != nil {
 		t.Fatal("welcome should not join the room")
+	}
+}
+
+func TestContinueFromMainMenuDoesNotJoinRoom(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 12,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterMainMenu(t, m)
+
+	next, cmd := m.Update(tui.ContinueRequested{})
+	if cmd != nil {
+		t.Fatal("ContinueRequested from main menu should not navigate")
+	}
+	m = assertModel(t, next)
+	if m.view != viewMainMenu {
+		t.Fatalf("view = %d, want viewMainMenu", m.view)
+	}
+	if m.subscription != nil {
+		t.Fatal("main menu continue should not join the room")
 	}
 }
 
@@ -269,7 +291,7 @@ func TestMainMenuMyChatsSelectionShowsMyChats(t *testing.T) {
 	if m.view != viewMyChats {
 		t.Fatalf("view = %d, want viewMyChats", m.view)
 	}
-	if m.joined || m.subscription != nil {
+	if m.subscription != nil {
 		t.Fatal("My Chats view should not join the room")
 	}
 }
@@ -314,8 +336,8 @@ func TestContinueFromMyChatsStartsChat(t *testing.T) {
 	if m.view != viewChat {
 		t.Fatalf("view = %d, want viewChat", m.view)
 	}
-	if !m.joined || m.subscription == nil {
-		t.Fatal("model should join selected Room")
+	if m.subscription == nil {
+		t.Fatal("model should create a Room subscription")
 	}
 }
 
@@ -346,9 +368,6 @@ func TestLeaveRequestedReturnsToMainMenuAndClosesSubscription(t *testing.T) {
 
 	if user.view != viewMainMenu {
 		t.Fatalf("view = %d, want viewMainMenu", user.view)
-	}
-	if user.joined {
-		t.Fatal("user should no longer be joined after leaving chat")
 	}
 	if user.subscription != nil {
 		t.Fatal("subscription should be cleared after leaving chat")
@@ -396,6 +415,7 @@ func TestQuitRequestedClosesSubscriptionBeforeQuit(t *testing.T) {
 		Member: chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterChat(t, m)
+	oldSubscription := m.subscription
 
 	next, cmd := m.Update(tui.QuitRequested{})
 	if cmd == nil {
@@ -411,7 +431,10 @@ func TestQuitRequestedClosesSubscriptionBeforeQuit(t *testing.T) {
 	if !m.closed {
 		t.Fatal("session should be marked closed")
 	}
-	assertSubscriptionClosed(t, m.subscription)
+	if m.subscription != nil {
+		t.Fatal("subscription should be cleared after quit")
+	}
+	assertSubscriptionClosed(t, oldSubscription)
 }
 
 func TestWaitForRoomEventClosesSubscriptionOnContextCancel(t *testing.T) {
@@ -488,23 +511,36 @@ func assertSubscriptionClosed(t *testing.T, subscription *chat.Subscription) {
 func enterChat(t *testing.T, m model) model {
 	t.Helper()
 
-	m = enterMainMenu(t, m)
+	m = enterMyChats(t, m)
 	next, cmd := m.Update(tui.ContinueRequested{})
 	if cmd == nil {
-		t.Fatal("continue from main menu should return Room View startup command")
+		t.Fatal("continue from My Chats should return Room View startup command")
 	}
 
 	m = assertModel(t, next)
 	if m.view != viewChat {
 		t.Fatalf("view = %d, want viewChat", m.view)
 	}
-	if !m.joined {
-		t.Fatal("model should be joined after main menu continue")
-	}
 	if m.subscription == nil {
-		t.Fatal("model should set subscription after main menu continue")
+		t.Fatal("model should set subscription after My Chats continue")
 	}
 
+	return m
+}
+
+func enterMyChats(t *testing.T, m model) model {
+	t.Helper()
+
+	m = enterMainMenu(t, m)
+	next, cmd := m.Update(tui.MainMenuSelectionRequested{Action: tui.MainMenuActionMyChats})
+	if cmd == nil {
+		t.Fatal("My Chats selection should return My Chats startup command")
+	}
+
+	m = assertModel(t, next)
+	if m.view != viewMyChats {
+		t.Fatalf("view = %d, want viewMyChats", m.view)
+	}
 	return m
 }
 
