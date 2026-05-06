@@ -87,13 +87,13 @@ func TestEnterRequestsSendAndClearsInput(t *testing.T) {
 		t.Fatalf("message count = %d, want 0 before display event", got)
 	}
 
-	m = updateRoomViewModel(t, m, MessageReceived{Body: msg.Body, Mine: true})
+	m = updateRoomViewModel(t, m, MessageReceived{Author: "you", Body: msg.Body, Role: MessageAuthorLocal})
 
 	view := m.View()
 	if !view.AltScreen {
 		t.Fatal("view should request alt-screen")
 	}
-	if !strings.Contains(view.Content, localAuthor) || !strings.Contains(view.Content, "hi") {
+	if !strings.Contains(view.Content, "you") || !strings.Contains(view.Content, "hi") {
 		t.Fatalf("view content should render local message, got %q", view.Content)
 	}
 }
@@ -101,14 +101,14 @@ func TestEnterRequestsSendAndClearsInput(t *testing.T) {
 func TestShortHistoryRendersAboveComposer(t *testing.T) {
 	m := newRoomViewModel(t, Config{Width: 40, Height: 8})
 
-	m = updateRoomViewModel(t, m, MessageReceived{Body: "hi", Mine: true})
+	m = updateRoomViewModel(t, m, MessageReceived{Author: "you", Body: "hi", Role: MessageAuthorLocal})
 
 	lines := strings.Split(m.View().Content, "\n")
-	if strings.Contains(lines[2], localAuthor) || strings.Contains(lines[2], "hi") {
+	if strings.Contains(lines[2], "you") || strings.Contains(lines[2], "hi") {
 		t.Fatalf("message should not start at top of message area, got %q", lines[2])
 	}
 	lastMsgRow := lines[4]
-	if !strings.Contains(lastMsgRow, localAuthor) || !strings.Contains(lastMsgRow, "hi") {
+	if !strings.Contains(lastMsgRow, "you") || !strings.Contains(lastMsgRow, "hi") {
 		t.Fatalf("bottom message row should include latest message, got %q", lastMsgRow)
 	}
 }
@@ -116,7 +116,7 @@ func TestShortHistoryRendersAboveComposer(t *testing.T) {
 func TestViewportSyncPreservesScrollOnResizeAndThemeChange(t *testing.T) {
 	m := newRoomViewModel(t, Config{Width: 40, Height: 8})
 	for i := 0; i < 10; i++ {
-		m = updateRoomViewModel(t, m, MessageReceived{Body: "message", Mine: true})
+		m = updateRoomViewModel(t, m, MessageReceived{Author: "you", Body: "message", Role: MessageAuthorLocal})
 	}
 	if !m.viewport.AtBottom() {
 		t.Fatal("received messages should follow to bottom")
@@ -138,7 +138,7 @@ func TestViewportSyncPreservesScrollOnResizeAndThemeChange(t *testing.T) {
 		t.Fatalf("theme change y offset = %d, want preserved offset %d", got, scrolledOffset)
 	}
 
-	m = updateRoomViewModel(t, m, MessageReceived{Body: "new", Mine: true})
+	m = updateRoomViewModel(t, m, MessageReceived{Author: "you", Body: "new", Role: MessageAuthorLocal})
 	if !m.viewport.AtBottom() {
 		t.Fatalf("new message should follow to bottom; offset = %d", m.viewport.YOffset())
 	}

@@ -2,14 +2,11 @@ package session
 
 import (
 	"context"
-	"fmt"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/luojam/ssh-chat/internal/chat"
 	"github.com/luojam/ssh-chat/internal/tui"
 )
-
-const systemAuthor = "[system]"
 
 type viewState int
 
@@ -29,7 +26,7 @@ type Config struct {
 	Context context.Context
 	Room    *chat.Room
 	// Member is who this session joins and posts as; kept on the model to attribute
-	// outgoing messages and to mark incoming lines as Mine vs others.
+	// outgoing messages and to label local Room events for terminal display.
 	Member chat.Member
 }
 
@@ -143,29 +140,6 @@ func (m model) waitForRoomEvent() tea.Cmd {
 			}
 			return roomEvent{event: event}
 		}
-	}
-}
-
-func (m model) displayMessage(event chat.Event) (tui.MessageReceived, bool) {
-	switch event.Kind {
-	case chat.MessagePosted:
-		return tui.MessageReceived{
-			Author: event.Message.Author.Name,
-			Body:   event.Message.Body,
-			Mine:   event.Message.Author.ID == m.member.ID,
-		}, true
-	case chat.MemberJoined:
-		return tui.MessageReceived{
-			Author: systemAuthor,
-			Body:   fmt.Sprintf("%s joined", event.Member.Name),
-		}, true
-	case chat.MemberLeft:
-		return tui.MessageReceived{
-			Author: systemAuthor,
-			Body:   fmt.Sprintf("%s left", event.Member.Name),
-		}, true
-	default:
-		return tui.MessageReceived{}, false
 	}
 }
 

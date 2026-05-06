@@ -39,7 +39,7 @@ func TestSendRequestedPostsToRoomAndRoomEventUpdatesTUI(t *testing.T) {
 	}
 }
 
-func TestRoomEventMarksOtherMemberMessageAsNotMine(t *testing.T) {
+func TestRoomEventMarksOtherMemberMessageAsRemote(t *testing.T) {
 	m := newModel(t, Config{
 		Width:  40,
 		Height: 8,
@@ -68,7 +68,33 @@ func TestRoomEventMarksOtherMemberMessageAsNotMine(t *testing.T) {
 	}
 }
 
-func TestRoomEventUsesMemberIDForMine(t *testing.T) {
+func TestRoomEventUsesUnknownAuthorForEmptyMemberName(t *testing.T) {
+	m := newModel(t, Config{
+		Width:  40,
+		Height: 8,
+		Room:   chat.NewRoom(),
+		Member: chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterChat(t, m)
+
+	next, _ := m.Update(roomEvent{
+		event: chat.Event{
+			Kind: chat.MessagePosted,
+			Message: chat.Message{
+				Author: chat.Member{ID: "anon-1", Name: ""},
+				Body:   "nameless",
+			},
+		},
+	})
+	m = assertModel(t, next)
+
+	view := m.View()
+	if !strings.Contains(view.Content, displayUnknownAuthor) || !strings.Contains(view.Content, "nameless") {
+		t.Fatalf("empty author should render as unknown, got %q", view.Content)
+	}
+}
+
+func TestRoomEventUsesMemberIDForLocalAuthor(t *testing.T) {
 	m := newModel(t, Config{
 		Width:  40,
 		Height: 8,
@@ -191,7 +217,7 @@ func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
 	m = assertModel(t, next)
 
 	view := m.View()
-	if !strings.Contains(view.Content, systemAuthor) || !strings.Contains(view.Content, "sara joined") {
+	if !strings.Contains(view.Content, displaySystemAuthor) || !strings.Contains(view.Content, "sara joined") {
 		t.Fatalf("join should render as system message, got %q", view.Content)
 	}
 
@@ -204,7 +230,7 @@ func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
 	m = assertModel(t, next)
 
 	view = m.View()
-	if !strings.Contains(view.Content, systemAuthor) || !strings.Contains(view.Content, "sara left") {
+	if !strings.Contains(view.Content, displaySystemAuthor) || !strings.Contains(view.Content, "sara left") {
 		t.Fatalf("leave should render as system message, got %q", view.Content)
 	}
 }

@@ -7,25 +7,25 @@ import (
 )
 
 const (
-	headerTitleColor     = "15"
-	headerDividerColor   = "240"
-	emptyMessageColor    = "8"
-	authorColor          = "12"
-	systemAuthorColor    = "11"
-	darkMineAuthorColor  = "10"
-	lightMineAuthorColor = "2"
-	darkBodyColor        = "15"
-	composerAccentColor  = "10"
-	composerMutedColor   = "8"
-	composerSepColor     = "240"
-	darkWelcomeBorder    = "7"
-	lightWelcomeBorder   = "8"
-	darkWelcomeTitle     = "10"
-	lightWelcomeTitle    = "2"
-	darkWelcomeLogo      = "10"
-	lightWelcomeLogo     = "2"
-	darkWelcomePrimary   = "15"
-	lightWelcomePrimary  = "0"
+	headerTitleColor      = "15"
+	headerDividerColor    = "240"
+	emptyMessageColor     = "8"
+	authorColor           = "12"
+	systemAuthorColor     = "11"
+	darkLocalAuthorColor  = "10"
+	lightLocalAuthorColor = "2"
+	darkBodyColor         = "15"
+	composerAccentColor   = "10"
+	composerMutedColor    = "8"
+	composerSepColor      = "240"
+	darkWelcomeBorder     = "7"
+	lightWelcomeBorder    = "8"
+	darkWelcomeTitle      = "10"
+	lightWelcomeTitle     = "2"
+	darkWelcomeLogo       = "10"
+	lightWelcomeLogo      = "2"
+	darkWelcomePrimary    = "15"
+	lightWelcomePrimary   = "0"
 
 	mainMenuBorderColor      = "62"
 	mainMenuSelectedButtonBg = "63"
@@ -44,7 +44,7 @@ type baseStyles struct {
 	empty            lipgloss.Style
 	author           lipgloss.Style
 	systemAuthor     lipgloss.Style
-	mineAuthor       lipgloss.Style
+	localAuthor      lipgloss.Style
 	body             lipgloss.Style
 	composer         lipgloss.Style
 	inputSep         lipgloss.Style
@@ -72,7 +72,7 @@ func newBaseStyles(isDark bool) baseStyles {
 	}
 
 	if isDark {
-		s.mineAuthor = lipgloss.NewStyle().Foreground(lipgloss.Color(darkMineAuthorColor))
+		s.localAuthor = lipgloss.NewStyle().Foreground(lipgloss.Color(darkLocalAuthorColor))
 		s.body = lipgloss.NewStyle().Foreground(lipgloss.Color(darkBodyColor))
 		s.welcomeBox = s.welcomeBox.BorderForeground(lipgloss.Color(darkWelcomeBorder))
 		s.welcomeTitle = s.welcomeTitle.Foreground(lipgloss.Color(darkWelcomeTitle))
@@ -81,7 +81,7 @@ func newBaseStyles(isDark bool) baseStyles {
 		return s
 	}
 
-	s.mineAuthor = lipgloss.NewStyle().Foreground(lipgloss.Color(lightMineAuthorColor))
+	s.localAuthor = lipgloss.NewStyle().Foreground(lipgloss.Color(lightLocalAuthorColor))
 	s.body = lipgloss.NewStyle()
 	s.welcomeBox = s.welcomeBox.BorderForeground(lipgloss.Color(lightWelcomeBorder))
 	s.welcomeTitle = s.welcomeTitle.Foreground(lipgloss.Color(lightWelcomeTitle))

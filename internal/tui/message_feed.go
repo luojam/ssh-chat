@@ -12,23 +12,28 @@ import (
 const (
 	authorColumnWidth = 8
 	emptyStateText    = "No messages yet."
-	localAuthor       = "you"
-	systemAuthor      = "[system]"
-	unknownAuthor     = "unknown"
+)
+
+type MessageAuthorRole int
+
+const (
+	MessageAuthorNormal MessageAuthorRole = iota
+	MessageAuthorLocal
+	MessageAuthorSystem
 )
 
 type message struct {
 	author string
 	body   string
-	mine   bool
+	role   MessageAuthorRole
 }
 
-// MessageReceived is display data for the terminal. Backend message IDs,
-// delivery rules, and storage details stay outside the TUI.
+// MessageReceived is terminal-ready display data. Session owns Room-event wording
+// and local author labelling; the TUI only lays out and styles the supplied line.
 type MessageReceived struct {
 	Author string
 	Body   string
-	Mine   bool
+	Role   MessageAuthorRole
 }
 
 func newMessageViewport() viewport.Model {
@@ -55,7 +60,7 @@ func (m *roomViewModel) receiveMessage(msg MessageReceived) {
 	m.messages = append(m.messages, message{
 		author: msg.Author,
 		body:   msg.Body,
-		mine:   msg.Mine,
+		role:   msg.Role,
 	})
 	m.syncMessageViewport(true)
 }
@@ -111,7 +116,7 @@ func (m roomViewModel) renderMessage(msg message, width int) []string {
 		bodyLines = []string{""}
 	}
 
-	authorCell := fixedCell(msg.displayAuthor(), authorColumnWidth)
+	authorCell := fixedCell(msg.author, authorColumnWidth)
 	authorStyle := m.messageAuthorStyle(msg)
 
 	lines := make([]string, 0, len(bodyLines))
@@ -126,21 +131,12 @@ func (m roomViewModel) renderMessage(msg message, width int) []string {
 }
 
 func (m roomViewModel) messageAuthorStyle(msg message) lipgloss.Style {
-	if msg.mine {
-		return m.styles.mineAuthor
-	}
-	if msg.displayAuthor() == systemAuthor {
+	switch msg.role {
+	case MessageAuthorLocal:
+		return m.styles.localAuthor
+	case MessageAuthorSystem:
 		return m.styles.systemAuthor
+	default:
+		return m.styles.author
 	}
-	return m.styles.author
-}
-
-func (msg message) displayAuthor() string {
-	if msg.mine {
-		return localAuthor
-	}
-	if msg.author == "" {
-		return unknownAuthor
-	}
-	return msg.author
 }
