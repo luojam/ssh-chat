@@ -28,8 +28,38 @@ func TestDashboardViewUsesFullFrame(t *testing.T) {
 	if !strings.Contains(view.Content, dashboardTitleLine) {
 		t.Fatalf("dashboard view should include title, got %q", view.Content)
 	}
-	if !strings.Contains(view.Content, dashboardJoinLine) {
-		t.Fatalf("dashboard view should include join hint, got %q", view.Content)
+}
+
+func TestDashboardViewIncludesOnlyActionableItems(t *testing.T) {
+	m := newDashboardModel(t, Config{Width: 50, Height: 20})
+	view := m.View()
+
+	items := m.list.Items()
+	if got, want := len(items), 1; got != want {
+		t.Fatalf("dashboard item count = %d, want %d", got, want)
+	}
+
+	first, ok := items[0].(dashboardItem)
+	if !ok {
+		t.Fatalf("first dashboard item has type %T, want dashboardItem", items[0])
+	}
+	if first.title != dashboardTownSquareTitle {
+		t.Fatalf("first dashboard item title = %q, want %q", first.title, dashboardTownSquareTitle)
+	}
+	if !strings.Contains(view.Content, first.title) {
+		t.Fatalf("dashboard view should include first item, got %q", view.Content)
+	}
+}
+
+func TestDashboardBoxAlmostFillsSmallFrame(t *testing.T) {
+	m := newDashboardModel(t, Config{Width: 20, Height: 8})
+	box := dashboardBoxSize(safeFrameSize(m.width, m.height), m.styles.box)
+
+	if got, want := box.width, 16; got != want {
+		t.Fatalf("box width = %d, want %d", got, want)
+	}
+	if got, want := box.height, 6; got != want {
+		t.Fatalf("box height = %d, want %d", got, want)
 	}
 }
 

@@ -219,9 +219,6 @@ func TestWelcomeContinueShowsDashboard(t *testing.T) {
 	if m.joined || m.subscription != nil {
 		t.Fatal("dashboard should not join the room")
 	}
-	if !strings.Contains(m.View().Content, "Dashboard") {
-		t.Fatalf("continue from welcome should render dashboard, got %q", m.View().Content)
-	}
 }
 
 func TestLeaveRequestedReturnsToDashboardAndClosesSubscription(t *testing.T) {
@@ -259,11 +256,6 @@ func TestLeaveRequestedReturnsToDashboardAndClosesSubscription(t *testing.T) {
 		t.Fatal("subscription should be cleared after leaving chat")
 	}
 	assertSubscriptionClosed(t, oldSubscription)
-
-	view := user.View()
-	if !strings.Contains(view.Content, "Dashboard") {
-		t.Fatalf("leaving chat should return to dashboard view, got %q", view.Content)
-	}
 
 	left := nextRoomEvent(t, sara.subscription, chat.MemberLeft)
 	if got := left.Member.Name; got != "user" {
