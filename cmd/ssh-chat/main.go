@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/luojam/ssh-chat/internal/chat"
 	"github.com/luojam/ssh-chat/internal/session"
 	"github.com/luojam/ssh-chat/internal/storage/sqlite"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 const (
@@ -50,8 +52,10 @@ func main() {
 	s, err := wish.NewServer(
 		wish.WithAddress(net.JoinHostPort(host, port)),
 		wish.WithHostKeyPath(hostKeyPath),
-		// No client auth for local TUI development speed; connect with:
-		//		ssh -p 2222 localhost
+		// Accept any client public key as transport identity. App-level username/password
+		// auth still happens in the TUI; this only makes Wish expose sess.PublicKey()
+		// so the Session can offer explicit key linking after password auth.
+		wish.WithPublicKeyAuth(func(_ ssh.Context, _ ssh.PublicKey) bool { return true }),
 
 		// Wish builds the handler chain from first to last, so the last middleware
 		// listed here runs first for each SSH session. That gives logging the outer
@@ -102,12 +106,16 @@ func teaHandler(sess ssh.Session, room *chat.Room, authService auth.Service) (te
 		return nil, nil
 	}
 
+	publicKey, fingerprint := sshKeyIdentity(sess)
+
 	return session.New(session.Config{
-		Width:       pty.Window.Width,
-		Height:      pty.Window.Height,
-		Context:     sess.Context(),
-		Room:        room,
-		AuthService: authService,
+		Width:             pty.Window.Width,
+		Height:            pty.Window.Height,
+		Context:           sess.Context(),
+		Room:              room,
+		AuthService:       authService,
+		SSHPublicKey:      publicKey,
+		SSHKeyFingerprint: fingerprint,
 		// Room participant for this connection: new opaque ID each SSH session; display
 		// name from SSH login (see memberName). chat.Member is the shared shape only.
 		Member: chat.Member{
@@ -115,6 +123,19 @@ func teaHandler(sess ssh.Session, room *chat.Room, authService auth.Service) (te
 			Name: memberName(sess),
 		},
 	}), []tea.ProgramOption{tea.WithContext(sess.Context())}
+}
+
+func sshKeyIdentity(sess ssh.Session) (string, string) {
+	return sshKeyIdentityFromPublicKey(sess.PublicKey())
+}
+
+func sshKeyIdentityFromPublicKey(key ssh.PublicKey) (string, string) {
+	if key == nil {
+		return "", ""
+	}
+	publicKey := strings.TrimSpace(string(gossh.MarshalAuthorizedKey(key)))
+	fingerprint := gossh.FingerprintSHA256(key)
+	return publicKey, fingerprint
 }
 
 func newSessionMemberID() (chat.MemberID, error) {

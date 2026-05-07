@@ -14,6 +14,7 @@ type viewState int
 const (
 	viewWelcome viewState = iota
 	viewAuth
+	viewLinkSSHKey
 	viewMainMenu
 	viewMyChats
 	viewChat
@@ -23,11 +24,13 @@ const (
 // identity in the room (same type chat uses for authors and join/leave); the transport
 // layer constructs it and passes it in—chat does not infer "current user" by itself.
 type Config struct {
-	Width       int
-	Height      int
-	Context     context.Context
-	Room        *chat.Room
-	AuthService auth.Service
+	Width             int
+	Height            int
+	Context           context.Context
+	Room              *chat.Room
+	AuthService       auth.Service
+	SSHPublicKey      string
+	SSHKeyFingerprint string
 	// Member is who this session joins and posts as; kept on the model to attribute
 	// outgoing messages and to label local Room events for terminal display.
 	Member chat.Member
@@ -39,33 +42,39 @@ func New(config Config) tea.Model {
 		ctx = context.Background()
 	}
 
-	return model{
-		ctx:         ctx,
-		room:        config.Room,
-		authService: config.AuthService,
-		member:      config.Member,
-		width:       config.Width,
-		height:      config.Height,
-		view:        viewWelcome,
+	m := model{
+		ctx:                         ctx,
+		room:                        config.Room,
+		authService:                 config.AuthService,
+		connectionSSHPublicKey:      config.SSHPublicKey,
+		connectionSSHKeyFingerprint: config.SSHKeyFingerprint,
+		member:                      config.Member,
+		width:                       config.Width,
+		height:                      config.Height,
+		view:                        viewWelcome,
 		ui: tui.NewWelcome(tui.Config{
 			Width:  config.Width,
 			Height: config.Height,
 		}),
 	}
+	m.authenticateWithConnectionSSHKey()
+	return m
 }
 
 type model struct {
-	ctx               context.Context
-	room              *chat.Room
-	authService       auth.Service
-	authenticatedUser *auth.User
-	member            chat.Member // local participant; pairs with Config.Member at construction
-	width             int
-	height            int
-	subscription      *chat.Subscription
-	view              viewState
-	closed            bool
-	ui                tea.Model
+	ctx                         context.Context
+	room                        *chat.Room
+	authService                 auth.Service
+	authenticatedUser           *auth.User
+	connectionSSHPublicKey      string
+	connectionSSHKeyFingerprint string
+	member                      chat.Member // local participant; pairs with Config.Member at construction
+	width                       int
+	height                      int
+	subscription                *chat.Subscription
+	view                        viewState
+	closed                      bool
+	ui                          tea.Model
 }
 
 type roomEvent struct {
@@ -87,7 +96,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tui.QuitRequested:
 		m.close()
 		return m, tea.Quit
-	case tui.ContinueRequested, tui.BackRequested, tui.AuthSubmissionRequested, tui.MainMenuSelectionRequested, tui.RoomSelected, tui.LeaveRequested:
+	case tui.ContinueRequested, tui.BackRequested, tui.AuthSubmissionRequested, tui.LinkSSHKeySelectionRequested, tui.MainMenuSelectionRequested, tui.RoomSelected, tui.LeaveRequested:
 		return m, m.applyFlowIntent(msg)
 	case tui.SendRequested:
 		return m, m.postMessage(msg.Body)

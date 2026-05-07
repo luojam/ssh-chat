@@ -88,26 +88,134 @@ func TestPasswordServiceLoginValidation(t *testing.T) {
 	}
 }
 
+func TestPasswordServiceFindUserBySSHKeyFingerprint(t *testing.T) {
+	store := newMemoryStore()
+	service := NewPasswordService(store)
+	user := StoredUser{User: User{ID: "user_1", Username: "alice"}, PasswordHash: "hash"}
+	if _, err := store.CreateUser(context.Background(), user); err != nil {
+		t.Fatalf("CreateUser returned error: %v", err)
+	}
+	if err := service.LinkSSHKey(context.Background(), user.User, "ssh-ed25519 AAAA", " SHA256:abc "); err != nil {
+		t.Fatalf("LinkSSHKey returned error: %v", err)
+	}
+
+	found, err := service.FindUserBySSHKeyFingerprint(context.Background(), "SHA256:abc")
+	if err != nil {
+		t.Fatalf("FindUserBySSHKeyFingerprint returned error: %v", err)
+	}
+	if found != user.User {
+		t.Fatalf("found user = %+v, want %+v", found, user.User)
+	}
+}
+
+func TestPasswordServiceSSHKeyLookupMissesCleanly(t *testing.T) {
+	service := NewPasswordService(newMemoryStore())
+	_, err := service.FindUserBySSHKeyFingerprint(context.Background(), "missing")
+	if !errors.Is(err, ErrSSHKeyNotFound) {
+		t.Fatalf("FindUserBySSHKeyFingerprint error = %v, want %v", err, ErrSSHKeyNotFound)
+	}
+
+	_, err = service.FindUserBySSHKeyFingerprint(context.Background(), " ")
+	if !errors.Is(err, ErrSSHKeyNotFound) {
+		t.Fatalf("empty fingerprint error = %v, want %v", err, ErrSSHKeyNotFound)
+	}
+}
+
+func TestPasswordServiceLinkSSHKeyValidation(t *testing.T) {
+	service := NewPasswordService(newMemoryStore())
+	tests := []struct {
+		name        string
+		user        User
+		publicKey   string
+		fingerprint string
+	}{
+		{name: "missing user", publicKey: "ssh-ed25519 AAAA", fingerprint: "SHA256:abc"},
+		{name: "missing public key", user: User{ID: "user_1"}, fingerprint: "SHA256:abc"},
+		{name: "missing fingerprint", user: User{ID: "user_1"}, publicKey: "ssh-ed25519 AAAA"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := service.LinkSSHKey(context.Background(), tt.user, tt.publicKey, tt.fingerprint)
+			if !errors.Is(err, ErrInvalidInput) {
+				t.Fatalf("LinkSSHKey error = %v, want %v", err, ErrInvalidInput)
+			}
+		})
+	}
+}
+
+func TestPasswordServiceDuplicateSameUserSSHKeyIsHarmless(t *testing.T) {
+	service := NewPasswordService(newMemoryStore())
+	user := User{ID: "user_1", Username: "alice"}
+	if err := service.LinkSSHKey(context.Background(), user, "ssh-ed25519 AAAA", "SHA256:abc"); err != nil {
+		t.Fatalf("first LinkSSHKey returned error: %v", err)
+	}
+	if err := service.LinkSSHKey(context.Background(), user, "ssh-ed25519 AAAA", "SHA256:abc"); err != nil {
+		t.Fatalf("duplicate same-user LinkSSHKey returned error: %v", err)
+	}
+}
+
+func TestPasswordServiceRejectsSSHKeyLinkedToAnotherUser(t *testing.T) {
+	service := NewPasswordService(newMemoryStore())
+	if err := service.LinkSSHKey(context.Background(), User{ID: "user_1"}, "ssh-ed25519 AAAA", "SHA256:abc"); err != nil {
+		t.Fatalf("first LinkSSHKey returned error: %v", err)
+	}
+	err := service.LinkSSHKey(context.Background(), User{ID: "user_2"}, "ssh-ed25519 AAAA", "SHA256:abc")
+	if !errors.Is(err, ErrSSHKeyAlreadyLinked) {
+		t.Fatalf("cross-user LinkSSHKey error = %v, want %v", err, ErrSSHKeyAlreadyLinked)
+	}
+}
+
 type memoryStore struct {
-	users map[string]StoredUser
+	usersByUsername map[string]StoredUser
+	usersByID       map[string]StoredUser
+	keys            map[string]SSHKey
 }
 
 func newMemoryStore() *memoryStore {
-	return &memoryStore{users: map[string]StoredUser{}}
+	return &memoryStore{
+		usersByUsername: map[string]StoredUser{},
+		usersByID:       map[string]StoredUser{},
+		keys:            map[string]SSHKey{},
+	}
 }
 
 func (s *memoryStore) CreateUser(_ context.Context, user StoredUser) (User, error) {
-	if _, ok := s.users[user.Username]; ok {
+	if _, ok := s.usersByUsername[user.Username]; ok {
 		return User{}, ErrUsernameTaken
 	}
-	s.users[user.Username] = user
+	s.usersByUsername[user.Username] = user
+	s.usersByID[user.ID] = user
 	return user.User, nil
 }
 
 func (s *memoryStore) FindByUsername(_ context.Context, username string) (StoredUser, error) {
-	user, ok := s.users[username]
+	user, ok := s.usersByUsername[username]
 	if !ok {
 		return StoredUser{}, ErrUserNotFound
 	}
 	return user, nil
+}
+
+func (s *memoryStore) FindUserBySSHKeyFingerprint(_ context.Context, fingerprint string) (User, error) {
+	key, ok := s.keys[fingerprint]
+	if !ok {
+		return User{}, ErrSSHKeyNotFound
+	}
+	user, ok := s.usersByID[key.UserID]
+	if !ok {
+		return User{ID: key.UserID}, nil
+	}
+	return user.User, nil
+}
+
+func (s *memoryStore) LinkSSHKey(_ context.Context, key SSHKey) error {
+	existing, ok := s.keys[key.Fingerprint]
+	if !ok {
+		s.keys[key.Fingerprint] = key
+		return nil
+	}
+	if existing.UserID == key.UserID {
+		return nil
+	}
+	return ErrSSHKeyAlreadyLinked
 }

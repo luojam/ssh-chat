@@ -56,6 +56,12 @@ type RoomSelected struct {
 	RoomID string
 }
 
+// LinkSSHKeySelectionRequested answers the post-password-auth key linking prompt.
+// The Session performs any storage work; the TUI only reports the selected action.
+type LinkSSHKeySelectionRequested struct {
+	Link bool
+}
+
 // LeaveRequested is emitted by the room view when the user chooses to leave the
 // room without quitting the SSH session.
 type LeaveRequested struct{}
@@ -87,6 +93,12 @@ func requestMainMenuSelection(action MainMenuAction) tea.Cmd {
 func requestRoomSelection(roomID string) tea.Cmd {
 	return func() tea.Msg {
 		return RoomSelected{RoomID: roomID}
+	}
+}
+
+func requestSSHKeyLinkSelection(link bool) tea.Cmd {
+	return func() tea.Msg {
+		return LinkSSHKeySelectionRequested{Link: link}
 	}
 }
 

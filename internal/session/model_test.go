@@ -280,6 +280,123 @@ func TestAuthSubmissionShowsMainMenu(t *testing.T) {
 	}
 }
 
+func TestLinkedSSHKeyAtStartupAuthenticatesUserAndWelcomeContinueSkipsAuth(t *testing.T) {
+	authService := newKeyAuthService()
+	authService.linked["SHA256:abc"] = auth.User{ID: "user-auth", Username: "alice"}
+	m := newModel(t, Config{
+		Width:             40,
+		Height:            8,
+		Room:              chat.NewRoom(),
+		AuthService:       authService,
+		SSHPublicKey:      "ssh-ed25519 AAAA",
+		SSHKeyFingerprint: "SHA256:abc",
+		Member:            chat.Member{ID: "session-1", Name: "ssh-user"},
+	})
+
+	if m.view != viewWelcome {
+		t.Fatalf("initial view = %d, want viewWelcome", m.view)
+	}
+	if m.authenticatedUser == nil || m.authenticatedUser.Username != "alice" {
+		t.Fatalf("authenticated user = %+v, want alice", m.authenticatedUser)
+	}
+	if m.member.ID != "user-auth" || m.member.Name != "alice" {
+		t.Fatalf("member = %+v, want key-authenticated member", m.member)
+	}
+
+	next, cmd := m.Update(tui.ContinueRequested{})
+	if cmd == nil {
+		t.Fatal("key-authenticated welcome continue should initialize main menu")
+	}
+	m = assertModel(t, next)
+	if m.view != viewMainMenu {
+		t.Fatalf("view = %d, want viewMainMenu", m.view)
+	}
+}
+
+func TestPasswordAuthWithUnlinkedSSHKeyShowsLinkPromptAndYesLinks(t *testing.T) {
+	authService := newKeyAuthService()
+	m := newModel(t, Config{
+		Width:             40,
+		Height:            12,
+		Room:              chat.NewRoom(),
+		AuthService:       authService,
+		SSHPublicKey:      "ssh-ed25519 AAAA",
+		SSHKeyFingerprint: "SHA256:abc",
+		Member:            chat.Member{ID: "session-1", Name: "ssh-user"},
+	})
+	m = enterAuth(t, m)
+
+	next, cmd := m.Update(tui.AuthSubmissionRequested{Mode: tui.AuthModeLogin, Username: "alice", Password: "password"})
+	if cmd == nil {
+		t.Fatal("auth with unlinked key should initialize link prompt")
+	}
+	m = assertModel(t, next)
+	if m.view != viewLinkSSHKey {
+		t.Fatalf("view = %d, want viewLinkSSHKey", m.view)
+	}
+
+	next, cmd = m.Update(tui.LinkSSHKeySelectionRequested{Link: true})
+	if cmd == nil {
+		t.Fatal("yes should initialize main menu")
+	}
+	m = assertModel(t, next)
+	if m.view != viewMainMenu {
+		t.Fatalf("view = %d, want viewMainMenu", m.view)
+	}
+	linked, ok := authService.linked["SHA256:abc"]
+	if !ok || linked.Username != "alice" {
+		t.Fatalf("linked key user = %+v, present %v; want alice", linked, ok)
+	}
+}
+
+func TestPasswordAuthWithUnlinkedSSHKeyNoSkipsLinking(t *testing.T) {
+	authService := newKeyAuthService()
+	m := newModel(t, Config{
+		Width:             40,
+		Height:            12,
+		Room:              chat.NewRoom(),
+		AuthService:       authService,
+		SSHPublicKey:      "ssh-ed25519 AAAA",
+		SSHKeyFingerprint: "SHA256:abc",
+		Member:            chat.Member{ID: "session-1", Name: "ssh-user"},
+	})
+	m = enterAuth(t, m)
+	next, _ := m.Update(tui.AuthSubmissionRequested{Mode: tui.AuthModeLogin, Username: "alice", Password: "password"})
+	m = assertModel(t, next)
+
+	next, cmd := m.Update(tui.LinkSSHKeySelectionRequested{Link: false})
+	if cmd == nil {
+		t.Fatal("no should initialize main menu")
+	}
+	m = assertModel(t, next)
+	if m.view != viewMainMenu {
+		t.Fatalf("view = %d, want viewMainMenu", m.view)
+	}
+	if _, ok := authService.linked["SHA256:abc"]; ok {
+		t.Fatal("no should not link key")
+	}
+}
+
+func TestPasswordAuthWithoutSSHKeyShowsMainMenuDirectly(t *testing.T) {
+	m := newModel(t, Config{
+		Width:       40,
+		Height:      12,
+		Room:        chat.NewRoom(),
+		AuthService: newKeyAuthService(),
+		Member:      chat.Member{ID: "session-1", Name: "ssh-user"},
+	})
+	m = enterAuth(t, m)
+
+	next, cmd := m.Update(tui.AuthSubmissionRequested{Mode: tui.AuthModeLogin, Username: "alice", Password: "password"})
+	if cmd == nil {
+		t.Fatal("auth without ssh key should initialize main menu")
+	}
+	m = assertModel(t, next)
+	if m.view != viewMainMenu {
+		t.Fatalf("view = %d, want viewMainMenu", m.view)
+	}
+}
+
 func TestFailedAuthSubmissionStaysOnAuth(t *testing.T) {
 	m := newModel(t, Config{
 		Width:       40,
@@ -810,6 +927,14 @@ func (successfulAuthService) Login(_ context.Context, username, _ string) (auth.
 	return auth.User{ID: username + "-auth", Username: username}, nil
 }
 
+func (successfulAuthService) FindUserBySSHKeyFingerprint(context.Context, string) (auth.User, error) {
+	return auth.User{}, auth.ErrSSHKeyNotFound
+}
+
+func (successfulAuthService) LinkSSHKey(context.Context, auth.User, string, string) error {
+	return nil
+}
+
 type failingAuthService struct {
 	err error
 }
@@ -820,6 +945,14 @@ func (s failingAuthService) Signup(context.Context, string, string, string) (aut
 
 func (s failingAuthService) Login(context.Context, string, string) (auth.User, error) {
 	return auth.User{}, s.err
+}
+
+func (s failingAuthService) FindUserBySSHKeyFingerprint(context.Context, string) (auth.User, error) {
+	return auth.User{}, s.err
+}
+
+func (s failingAuthService) LinkSSHKey(context.Context, auth.User, string, string) error {
+	return s.err
 }
 
 type recordingAuthService struct {
@@ -835,4 +968,48 @@ func (s *recordingAuthService) Signup(_ context.Context, username, _, confirmPas
 
 func (s *recordingAuthService) Login(context.Context, string, string) (auth.User, error) {
 	return auth.User{}, errors.New("unexpected login")
+}
+
+func (s *recordingAuthService) FindUserBySSHKeyFingerprint(context.Context, string) (auth.User, error) {
+	return auth.User{}, auth.ErrSSHKeyNotFound
+}
+
+func (s *recordingAuthService) LinkSSHKey(context.Context, auth.User, string, string) error {
+	return nil
+}
+
+type keyAuthService struct {
+	linked map[string]auth.User
+}
+
+func newKeyAuthService() *keyAuthService {
+	return &keyAuthService{linked: map[string]auth.User{}}
+}
+
+func (s *keyAuthService) Signup(_ context.Context, username, _, _ string) (auth.User, error) {
+	return auth.User{ID: username + "-auth", Username: username}, nil
+}
+
+func (s *keyAuthService) Login(_ context.Context, username, _ string) (auth.User, error) {
+	return auth.User{ID: username + "-auth", Username: username}, nil
+}
+
+func (s *keyAuthService) FindUserBySSHKeyFingerprint(_ context.Context, fingerprint string) (auth.User, error) {
+	user, ok := s.linked[fingerprint]
+	if !ok {
+		return auth.User{}, auth.ErrSSHKeyNotFound
+	}
+	return user, nil
+}
+
+func (s *keyAuthService) LinkSSHKey(_ context.Context, user auth.User, _, fingerprint string) error {
+	linked, ok := s.linked[fingerprint]
+	if !ok {
+		s.linked[fingerprint] = user
+		return nil
+	}
+	if linked.ID == user.ID {
+		return nil
+	}
+	return auth.ErrSSHKeyAlreadyLinked
 }

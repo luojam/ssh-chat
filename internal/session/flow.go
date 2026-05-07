@@ -26,6 +26,8 @@ func (m *model) applyFlowIntent(msg tea.Msg) tea.Cmd {
 		return m.backFromCurrentView()
 	case tui.AuthSubmissionRequested:
 		return m.submitAuth(msg)
+	case tui.LinkSSHKeySelectionRequested:
+		return m.answerSSHKeyLink(msg.Link)
 	case tui.MainMenuSelectionRequested:
 		return m.openMainMenuSelection(msg.Action)
 	case tui.RoomSelected:
@@ -72,9 +74,10 @@ func (m *model) submitAuth(submission tui.AuthSubmissionRequested) tea.Cmd {
 		return m.showAuthError(authErrorMessage(err))
 	}
 
-	m.authenticatedUser = &user
-	m.member.ID = chatMemberID(user.ID)
-	m.member.Name = user.Username
+	m.setAuthenticatedUser(user)
+	if m.shouldPromptForSSHKeyLink() {
+		return m.showStandaloneView(viewLinkSSHKey)
+	}
 	return m.showStandaloneView(viewMainMenu)
 }
 
@@ -106,6 +109,43 @@ func authErrorMessage(err error) string {
 	default:
 		return "Authentication failed."
 	}
+}
+
+func (m *model) authenticateWithConnectionSSHKey() {
+	if m.authService == nil || m.connectionSSHKeyFingerprint == "" {
+		return
+	}
+	user, err := m.authService.FindUserBySSHKeyFingerprint(m.ctx, m.connectionSSHKeyFingerprint)
+	if err != nil {
+		return
+	}
+	m.setAuthenticatedUser(user)
+}
+
+func (m *model) shouldPromptForSSHKeyLink() bool {
+	if m.authService == nil || m.connectionSSHPublicKey == "" || m.connectionSSHKeyFingerprint == "" {
+		return false
+	}
+	_, err := m.authService.FindUserBySSHKeyFingerprint(m.ctx, m.connectionSSHKeyFingerprint)
+	return errors.Is(err, auth.ErrSSHKeyNotFound)
+}
+
+func (m *model) answerSSHKeyLink(link bool) tea.Cmd {
+	if m.view != viewLinkSSHKey {
+		return nil
+	}
+	if link && m.authenticatedUser != nil && m.authService != nil {
+		// Duplicate same-user links are handled as a no-op by the auth service. If
+		// the key was raced onto another user, continue safely without relinking.
+		_ = m.authService.LinkSSHKey(m.ctx, *m.authenticatedUser, m.connectionSSHPublicKey, m.connectionSSHKeyFingerprint)
+	}
+	return m.showStandaloneView(viewMainMenu)
+}
+
+func (m *model) setAuthenticatedUser(user auth.User) {
+	m.authenticatedUser = &user
+	m.member.ID = chatMemberID(user.ID)
+	m.member.Name = user.Username
 }
 
 func chatMemberID(userID string) chat.MemberID {
@@ -189,6 +229,9 @@ func (m model) newUI(view viewState) tea.Model {
 		return tui.NewWelcome(config)
 	case viewAuth:
 		return tui.NewAuth(config)
+	case viewLinkSSHKey:
+		config.SSHKeyFingerprint = m.connectionSSHKeyFingerprint
+		return tui.NewLinkSSHKey(config)
 	case viewMainMenu:
 		return tui.NewMainMenu(config)
 	case viewMyChats:

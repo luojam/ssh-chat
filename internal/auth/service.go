@@ -15,11 +15,15 @@ const bcryptCost = bcrypt.DefaultCost
 type Store interface {
 	CreateUser(ctx context.Context, user StoredUser) (User, error)
 	FindByUsername(ctx context.Context, username string) (StoredUser, error)
+	FindUserBySSHKeyFingerprint(ctx context.Context, fingerprint string) (User, error)
+	LinkSSHKey(ctx context.Context, key SSHKey) error
 }
 
 type Service interface {
 	Signup(ctx context.Context, username, password, confirmPassword string) (User, error)
 	Login(ctx context.Context, username, password string) (User, error)
+	FindUserBySSHKeyFingerprint(ctx context.Context, fingerprint string) (User, error)
+	LinkSSHKey(ctx context.Context, user User, publicKey, fingerprint string) error
 }
 
 type PasswordService struct {
@@ -85,14 +89,53 @@ func (s *PasswordService) Login(ctx context.Context, username, password string) 
 	return stored.User, nil
 }
 
+func (s *PasswordService) FindUserBySSHKeyFingerprint(ctx context.Context, fingerprint string) (User, error) {
+	fingerprint = normalizeFingerprint(fingerprint)
+	if fingerprint == "" {
+		return User{}, ErrSSHKeyNotFound
+	}
+	return s.store.FindUserBySSHKeyFingerprint(ctx, fingerprint)
+}
+
+func (s *PasswordService) LinkSSHKey(ctx context.Context, user User, publicKey, fingerprint string) error {
+	publicKey = strings.TrimSpace(publicKey)
+	fingerprint = normalizeFingerprint(fingerprint)
+	if user.ID == "" || publicKey == "" || fingerprint == "" {
+		return ErrInvalidInput
+	}
+
+	keyID, err := newSSHKeyID()
+	if err != nil {
+		return err
+	}
+	return s.store.LinkSSHKey(ctx, SSHKey{
+		ID:          keyID,
+		UserID:      user.ID,
+		PublicKey:   publicKey,
+		Fingerprint: fingerprint,
+	})
+}
+
 func normalizeUsername(username string) string {
 	return strings.TrimSpace(username)
 }
 
+func normalizeFingerprint(fingerprint string) string {
+	return strings.TrimSpace(fingerprint)
+}
+
 func newUserID() (string, error) {
+	return newOpaqueID("user_")
+}
+
+func newSSHKeyID() (string, error) {
+	return newOpaqueID("sshkey_")
+}
+
+func newOpaqueID(prefix string) (string, error) {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", err
 	}
-	return "user_" + hex.EncodeToString(b[:]), nil
+	return prefix + hex.EncodeToString(b[:]), nil
 }
