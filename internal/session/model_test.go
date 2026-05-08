@@ -800,7 +800,7 @@ const testRoomID chat.RoomID = "town-square"
 func newTestChatService() *chat.Service {
 	store := &testChatStore{
 		rooms: map[chat.RoomID]chat.StoredRoom{
-			testRoomID: {ID: testRoomID, Title: "Town Square", CreatedBy: "system"},
+			testRoomID: {ID: testRoomID, Title: "Town Square", JoinCode: "7KQ9M2XP", CreatedBy: "system"},
 		},
 		messages:    map[chat.RoomID][]chat.Message{},
 		nextMessage: 1,
@@ -820,7 +820,7 @@ func (s *testChatStore) CreateRoom(_ context.Context, room chat.StoredRoom, owne
 	defer s.mu.Unlock()
 
 	s.rooms[room.ID] = room
-	return chat.RoomSummary{ID: room.ID, Title: room.Title, Role: role, CreatedAt: room.CreatedAt}, nil
+	return chat.RoomSummary{ID: room.ID, Title: room.Title, JoinCode: room.JoinCode, Role: role, CreatedAt: room.CreatedAt}, nil
 }
 
 func (s *testChatStore) ListRoomsForUser(_ context.Context, userID chat.UserID) ([]chat.RoomSummary, error) {
@@ -833,7 +833,7 @@ func (s *testChatStore) ListRoomsForUser(_ context.Context, userID chat.UserID) 
 
 	rooms := make([]chat.RoomSummary, 0, len(s.rooms))
 	for _, room := range s.rooms {
-		rooms = append(rooms, chat.RoomSummary{ID: room.ID, Title: room.Title, Role: chat.RoomRoleOwner, CreatedAt: room.CreatedAt})
+		rooms = append(rooms, chat.RoomSummary{ID: room.ID, Title: room.Title, JoinCode: room.JoinCode, Role: chat.RoomRoleOwner, CreatedAt: room.CreatedAt})
 	}
 	sort.Slice(rooms, func(i, j int) bool { return rooms[i].ID < rooms[j].ID })
 	return rooms, nil

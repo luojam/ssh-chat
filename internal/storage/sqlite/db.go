@@ -44,6 +44,7 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		`CREATE TABLE IF NOT EXISTS rooms (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
+			join_code TEXT NOT NULL,
 			created_by TEXT NOT NULL,
 			created_at TEXT NOT NULL,
 			FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
@@ -70,6 +71,7 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_room_memberships_user_id ON room_memberships(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_messages_room_id_id ON messages(room_id, id)`,
 		`CREATE INDEX IF NOT EXISTS idx_rooms_created_at ON rooms(created_at)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_rooms_join_code ON rooms(join_code)`,
 	}
 	for _, statement := range statements {
 		if _, err := db.ExecContext(ctx, statement); err != nil {

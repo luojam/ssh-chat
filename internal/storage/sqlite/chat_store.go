@@ -28,8 +28,8 @@ func (s *ChatStore) CreateRoom(ctx context.Context, room chat.StoredRoom, owner 
 
 	createdAt := formatTime(room.CreatedAt)
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO rooms (id, title, created_by, created_at) VALUES (?, ?, ?, ?)`,
-		room.ID, room.Title, room.CreatedBy, createdAt,
+		`INSERT INTO rooms (id, title, join_code, created_by, created_at) VALUES (?, ?, ?, ?, ?)`,
+		room.ID, room.Title, room.JoinCode, room.CreatedBy, createdAt,
 	); err != nil {
 		return chat.RoomSummary{}, err
 	}
@@ -46,6 +46,7 @@ func (s *ChatStore) CreateRoom(ctx context.Context, room chat.StoredRoom, owner 
 	return chat.RoomSummary{
 		ID:        room.ID,
 		Title:     room.Title,
+		JoinCode:  room.JoinCode,
 		Role:      role,
 		CreatedAt: room.CreatedAt,
 	}, nil
@@ -53,7 +54,7 @@ func (s *ChatStore) CreateRoom(ctx context.Context, room chat.StoredRoom, owner 
 
 func (s *ChatStore) ListRoomsForUser(ctx context.Context, userID chat.UserID) ([]chat.RoomSummary, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT rooms.id, rooms.title, room_memberships.role, rooms.created_at
+		`SELECT rooms.id, rooms.title, rooms.join_code, room_memberships.role, rooms.created_at
 		FROM room_memberships
 		JOIN rooms ON rooms.id = room_memberships.room_id
 		WHERE room_memberships.user_id = ?
@@ -70,7 +71,8 @@ func (s *ChatStore) ListRoomsForUser(ctx context.Context, userID chat.UserID) ([
 		var room chat.RoomSummary
 		var role string
 		var createdAt string
-		if err := rows.Scan(&room.ID, &room.Title, &role, &createdAt); err != nil {
+		var joinCode string
+		if err := rows.Scan(&room.ID, &room.Title, &joinCode, &role, &createdAt); err != nil {
 			return nil, err
 		}
 		parsedRole, err := chat.ParseRoomRole(role)
@@ -78,6 +80,9 @@ func (s *ChatStore) ListRoomsForUser(ctx context.Context, userID chat.UserID) ([
 			return nil, err
 		}
 		room.Role = parsedRole
+		if parsedRole == chat.RoomRoleOwner {
+			room.JoinCode = joinCode
+		}
 		room.CreatedAt, err = parseTime(createdAt)
 		if err != nil {
 			return nil, err

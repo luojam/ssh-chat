@@ -20,6 +20,7 @@ type Config struct {
 	Height            int
 	Rooms             []RoomListItem
 	RoomTitle         string
+	RoomJoinCode      string
 	SSHKeyFingerprint string
 }
 
@@ -39,6 +40,7 @@ func NewRoomView(config Config) tea.Model {
 		screen:     newScreenState(config),
 		styles:     newBaseStyles(true),
 		title:      title,
+		joinCode:   strings.TrimSpace(config.RoomJoinCode),
 		input:      input,
 		viewport:   newMessageViewport(),
 		initialCmd: focusCmd,
@@ -52,6 +54,7 @@ type roomViewModel struct {
 
 	styles   baseStyles
 	title    string
+	joinCode string
 	input    textinput.Model
 	viewport viewport.Model
 	messages []message

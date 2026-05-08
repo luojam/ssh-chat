@@ -25,6 +25,9 @@ func TestServiceCreateRoomCreatesOwnerMembershipAndListsForUser(t *testing.T) {
 	if room.Role != RoomRoleOwner {
 		t.Fatalf("role = %q, want owner", room.Role)
 	}
+	if len(room.JoinCode) != joinCodeLength {
+		t.Fatalf("join code = %q, want %d characters", room.JoinCode, joinCodeLength)
+	}
 
 	rooms, err := service.ListRoomsForUser(context.Background(), "user-1")
 	if err != nil {
@@ -161,7 +164,7 @@ func (s *memoryChatStore) CreateRoom(_ context.Context, room StoredRoom, owner U
 		s.memberships[room.ID] = map[UserID]RoomRole{}
 	}
 	s.memberships[room.ID][owner] = role
-	return RoomSummary{ID: room.ID, Title: room.Title, Role: role, CreatedAt: room.CreatedAt}, nil
+	return RoomSummary{ID: room.ID, Title: room.Title, JoinCode: room.JoinCode, Role: role, CreatedAt: room.CreatedAt}, nil
 }
 
 func (s *memoryChatStore) ListRoomsForUser(_ context.Context, userID UserID) ([]RoomSummary, error) {
@@ -172,7 +175,11 @@ func (s *memoryChatStore) ListRoomsForUser(_ context.Context, userID UserID) ([]
 			continue
 		}
 		room := s.rooms[roomID]
-		rooms = append(rooms, RoomSummary{ID: room.ID, Title: room.Title, Role: role, CreatedAt: room.CreatedAt})
+		summary := RoomSummary{ID: room.ID, Title: room.Title, Role: role, CreatedAt: room.CreatedAt}
+		if role == RoomRoleOwner {
+			summary.JoinCode = room.JoinCode
+		}
+		rooms = append(rooms, summary)
 	}
 	return rooms, nil
 }

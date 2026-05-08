@@ -18,6 +18,7 @@ const (
 	historyLimit       = 16
 	subscriptionBuffer = 16
 	maxRoomTitleRunes  = 64
+	joinCodeLength     = 8
 )
 
 type UserID string
@@ -47,6 +48,7 @@ func ParseRoomRole(role string) (RoomRole, error) {
 type RoomSummary struct {
 	ID        RoomID
 	Title     string
+	JoinCode  string
 	Role      RoomRole
 	CreatedAt time.Time
 }
@@ -54,6 +56,7 @@ type RoomSummary struct {
 type StoredRoom struct {
 	ID        RoomID
 	Title     string
+	JoinCode  string
 	CreatedBy UserID
 	CreatedAt time.Time
 }

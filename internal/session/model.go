@@ -79,6 +79,7 @@ type model struct {
 	roomList                    []chat.RoomSummary
 	activeRoomID                chat.RoomID
 	activeRoomTitle             string
+	activeRoomJoinCode          string
 	subscription                *chat.Subscription
 	view                        viewState
 	closed                      bool

@@ -24,30 +24,38 @@ func TestChatStoreCreateListAndMessages(t *testing.T) {
 	room, err := store.CreateRoom(ctx, chat.StoredRoom{
 		ID:        "room-1",
 		Title:     "Room One",
+		JoinCode:  "7KQ9M2XP",
 		CreatedBy: "user-1",
 		CreatedAt: createdAt,
 	}, "user-1", chat.RoomRoleOwner)
 	if err != nil {
 		t.Fatalf("CreateRoom returned error: %v", err)
 	}
-	if room.Role != chat.RoomRoleOwner || room.Title != "Room One" {
-		t.Fatalf("room summary = %+v, want owner Room One", room)
+	if room.Role != chat.RoomRoleOwner || room.Title != "Room One" || room.JoinCode != "7KQ9M2XP" {
+		t.Fatalf("room summary = %+v, want owner Room One with join code", room)
 	}
 
 	rooms, err := store.ListRoomsForUser(ctx, "user-1")
 	if err != nil {
 		t.Fatalf("ListRoomsForUser returned error: %v", err)
 	}
-	if len(rooms) != 1 || rooms[0].ID != "room-1" {
-		t.Fatalf("rooms = %+v, want room-1", rooms)
+	if len(rooms) != 1 || rooms[0].ID != "room-1" || rooms[0].JoinCode != "7KQ9M2XP" {
+		t.Fatalf("rooms = %+v, want room-1 with owner join code", rooms)
 	}
 
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO room_memberships (room_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`,
+		"room-1", "user-2", chat.RoomRoleMember, formatTime(createdAt),
+	)
+	if err != nil {
+		t.Fatalf("insert member: %v", err)
+	}
 	otherRooms, err := store.ListRoomsForUser(ctx, "user-2")
 	if err != nil {
 		t.Fatalf("ListRoomsForUser other returned error: %v", err)
 	}
-	if len(otherRooms) != 0 {
-		t.Fatalf("other user rooms = %+v, want none", otherRooms)
+	if len(otherRooms) != 1 || otherRooms[0].JoinCode != "" {
+		t.Fatalf("other user rooms = %+v, want redacted member join code", otherRooms)
 	}
 
 	isMember, err := store.IsRoomMember(ctx, "room-1", "user-1")

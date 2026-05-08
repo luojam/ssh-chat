@@ -272,6 +272,7 @@ func (m *model) enterRoomView(room chat.RoomSummary, subscription *chat.Subscrip
 	m.closeRoomMembership()
 	m.activeRoomID = room.ID
 	m.activeRoomTitle = room.Title
+	m.activeRoomJoinCode = room.JoinCode
 	m.subscription = subscription
 	m.view = viewChat
 	m.ui = m.newUI(viewChat)
@@ -293,6 +294,7 @@ func (m *model) closeRoomMembership() {
 	}
 	m.activeRoomID = ""
 	m.activeRoomTitle = ""
+	m.activeRoomJoinCode = ""
 }
 
 func (m model) inRoomView() bool {
@@ -318,6 +320,7 @@ func (m model) newUI(view viewState) tea.Model {
 		return tui.NewManageRooms(config)
 	case viewChat:
 		config.RoomTitle = m.activeRoomTitle
+		config.RoomJoinCode = chat.FormatJoinCode(m.activeRoomJoinCode)
 		return tui.NewRoomView(config)
 	default:
 		return tui.NewWelcome(config)

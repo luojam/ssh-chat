@@ -17,6 +17,8 @@ type Store interface {
 	RecentMessages(ctx context.Context, roomID RoomID, limit int) ([]Message, error)
 }
 
+const joinCodeAlphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+
 type Service struct {
 	store Store
 
@@ -44,9 +46,14 @@ func (s *Service) CreateRoom(ctx context.Context, creator UserID, title string) 
 	if err != nil {
 		return RoomSummary{}, err
 	}
+	joinCode, err := newJoinCode()
+	if err != nil {
+		return RoomSummary{}, err
+	}
 	room := StoredRoom{
 		ID:        id,
 		Title:     title,
+		JoinCode:  joinCode,
 		CreatedBy: creator,
 		CreatedAt: time.Now().UTC(),
 	}
@@ -142,4 +149,23 @@ func newRoomID() (RoomID, error) {
 		return "", err
 	}
 	return RoomID("room_" + hex.EncodeToString(b[:])), nil
+}
+
+func newJoinCode() (string, error) {
+	b := make([]byte, joinCodeLength)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	for i := range b {
+		b[i] = joinCodeAlphabet[int(b[i])%len(joinCodeAlphabet)]
+	}
+	return string(b), nil
+}
+
+func FormatJoinCode(code string) string {
+	code = strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(code), "-", ""))
+	if len(code) != joinCodeLength {
+		return code
+	}
+	return code[:4] + "-" + code[4:]
 }

@@ -52,6 +52,15 @@ func TestInitialLayoutUsesFullFrame(t *testing.T) {
 	}
 }
 
+func TestRoomHeaderShowsJoinCodeWhenProvided(t *testing.T) {
+	m := newRoomViewModel(t, Config{Width: 60, Height: 8, RoomTitle: "Project", RoomJoinCode: "7KQ9-M2XP"})
+
+	firstLine := strings.Split(m.View().Content, "\n")[0]
+	if !strings.Contains(firstLine, "Project") || !strings.Contains(firstLine, "Join code: 7KQ9-M2XP") {
+		t.Fatalf("header = %q, want title and join code", firstLine)
+	}
+}
+
 func TestTinyLayoutsUseFullFrameHeight(t *testing.T) {
 	for height := 1; height <= 8; height++ {
 		m := newRoomViewModel(t, Config{Width: 40, Height: height})
