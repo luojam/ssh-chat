@@ -17,23 +17,29 @@ const (
 	viewLinkSSHKey
 	viewMainMenu
 	viewMyChats
+	viewManageRooms
 	viewChat
 )
 
-// Config wires one Bubble Tea session to the shared room. Member is this SSH client's
-// identity in the room (same type chat uses for authors and join/leave); the transport
-// layer constructs it and passes it in—chat does not infer "current user" by itself.
+type ChatService interface {
+	CreateRoom(ctx context.Context, creator chat.UserID, title string) (chat.RoomSummary, error)
+	ListRoomsForUser(ctx context.Context, userID chat.UserID) ([]chat.RoomSummary, error)
+	JoinRoom(ctx context.Context, roomID chat.RoomID, member chat.Member) (*chat.Subscription, error)
+	Post(ctx context.Context, roomID chat.RoomID, author chat.Member, body string) (chat.Message, error)
+}
+
+// Config wires one Bubble Tea session to chat/auth services. Member is replaced
+// with the authenticated user identity before any room action is allowed.
 type Config struct {
 	Width             int
 	Height            int
 	Context           context.Context
-	Room              *chat.Room
+	ChatService       ChatService
+	Room              *chat.Room // deprecated test compatibility; application code should pass ChatService.
 	AuthService       auth.Service
 	SSHPublicKey      string
 	SSHKeyFingerprint string
-	// Member is who this session joins and posts as; kept on the model to attribute
-	// outgoing messages and to label local Room events for terminal display.
-	Member chat.Member
+	Member            chat.Member
 }
 
 func New(config Config) tea.Model {
@@ -42,9 +48,14 @@ func New(config Config) tea.Model {
 		ctx = context.Background()
 	}
 
+	chatService := config.ChatService
+	if chatService == nil && config.Room != nil {
+		chatService = legacyRoomService{room: config.Room}
+	}
+
 	m := model{
 		ctx:                         ctx,
-		room:                        config.Room,
+		chatService:                 chatService,
 		authService:                 config.AuthService,
 		connectionSSHPublicKey:      config.SSHPublicKey,
 		connectionSSHKeyFingerprint: config.SSHKeyFingerprint,
@@ -63,14 +74,17 @@ func New(config Config) tea.Model {
 
 type model struct {
 	ctx                         context.Context
-	room                        *chat.Room
+	chatService                 ChatService
 	authService                 auth.Service
 	authenticatedUser           *auth.User
 	connectionSSHPublicKey      string
 	connectionSSHKeyFingerprint string
-	member                      chat.Member // local participant; pairs with Config.Member at construction
+	member                      chat.Member // authenticated participant after login/key auth
 	width                       int
 	height                      int
+	roomList                    []chat.RoomSummary
+	activeRoomID                chat.RoomID
+	activeRoomTitle             string
 	subscription                *chat.Subscription
 	view                        viewState
 	closed                      bool
@@ -96,7 +110,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tui.QuitRequested:
 		m.close()
 		return m, tea.Quit
-	case tui.ContinueRequested, tui.BackRequested, tui.AuthSubmissionRequested, tui.LinkSSHKeySelectionRequested, tui.MainMenuSelectionRequested, tui.RoomSelected, tui.LeaveRequested:
+	case tui.ContinueRequested, tui.BackRequested, tui.AuthSubmissionRequested, tui.LinkSSHKeySelectionRequested, tui.MainMenuSelectionRequested, tui.RoomSelected, tui.CreateRoomRequested, tui.LeaveRequested:
 		return m, m.applyFlowIntent(msg)
 	case tui.SendRequested:
 		return m, m.postMessage(msg.Body)
@@ -124,10 +138,10 @@ func (m model) View() tea.View {
 
 func (m model) postMessage(body string) tea.Cmd {
 	return func() tea.Msg {
-		if m.closed || !m.inRoomView() {
+		if m.closed || !m.inRoomView() || m.chatService == nil || m.activeRoomID == "" || !m.isAuthenticated() {
 			return nil
 		}
-		_, _ = m.room.Post(m.member, body)
+		_, _ = m.chatService.Post(m.ctx, m.activeRoomID, m.member, body)
 		return nil
 	}
 }

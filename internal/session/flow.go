@@ -9,8 +9,6 @@ import (
 	"github.com/luojam/ssh-chat/internal/tui"
 )
 
-const townSquareRoomID = "town-square"
-
 // applyFlowIntent is the Session navigation table. Keeping transitions here
 // concentrates the important invariant: only the Room View may hold a Room
 // Subscription, and leaving that View closes the Subscription before navigation.
@@ -32,6 +30,8 @@ func (m *model) applyFlowIntent(msg tea.Msg) tea.Cmd {
 		return m.openMainMenuSelection(msg.Action)
 	case tui.RoomSelected:
 		return m.enterSelectedRoom(msg.RoomID)
+	case tui.CreateRoomRequested:
+		return m.createRoom(msg.Title)
 	case tui.LeaveRequested:
 		return m.leaveRoomView()
 	default:
@@ -58,6 +58,8 @@ func (m *model) backFromCurrentView() tea.Cmd {
 	case viewMainMenu:
 		return m.showStandaloneView(viewWelcome)
 	case viewMyChats:
+		return m.showStandaloneView(viewMainMenu)
+	case viewManageRooms:
 		return m.showStandaloneView(viewMainMenu)
 	default:
 		return nil
@@ -144,12 +146,8 @@ func (m *model) answerSSHKeyLink(link bool) tea.Cmd {
 
 func (m *model) setAuthenticatedUser(user auth.User) {
 	m.authenticatedUser = &user
-	m.member.ID = chatMemberID(user.ID)
+	m.member.ID = chat.UserID(user.ID)
 	m.member.Name = user.Username
-}
-
-func chatMemberID(userID string) chat.MemberID {
-	return chat.MemberID(userID)
 }
 
 func (m *model) openMainMenuSelection(action tui.MainMenuAction) tea.Cmd {
@@ -159,7 +157,12 @@ func (m *model) openMainMenuSelection(action tui.MainMenuAction) tea.Cmd {
 
 	switch action {
 	case tui.MainMenuActionMyChats:
-		return m.showStandaloneView(viewMyChats)
+		return m.showMyChats()
+	case tui.MainMenuActionManageRooms:
+		if !m.isAuthenticated() {
+			return nil
+		}
+		return m.showStandaloneView(viewManageRooms)
 	default:
 		return nil
 	}
@@ -183,22 +186,95 @@ func (m model) isAuthenticated() bool {
 	return m.authenticatedUser != nil
 }
 
-func (m *model) enterSelectedRoom(roomID string) tea.Cmd {
-	if m.view != viewMyChats || roomID != townSquareRoomID {
-		return nil
+func (m model) currentChatUserID() (chat.UserID, bool) {
+	if m.authenticatedUser == nil {
+		return "", false
 	}
-	return m.enterRoomView()
+	return chat.UserID(m.authenticatedUser.ID), true
 }
 
-func (m *model) enterRoomView() tea.Cmd {
-	if m.closed || m.inRoomView() {
+func (m *model) showMyChats() tea.Cmd {
+	userID, ok := m.currentChatUserID()
+	if !ok || m.chatService == nil {
+		return nil
+	}
+	rooms, err := m.chatService.ListRoomsForUser(m.ctx, userID)
+	if err != nil {
+		return nil
+	}
+	m.roomList = rooms
+	return m.showStandaloneView(viewMyChats)
+}
+
+func (m *model) enterSelectedRoom(roomID string) tea.Cmd {
+	if m.view != viewMyChats || m.chatService == nil || !m.isAuthenticated() {
+		return nil
+	}
+	selected, ok := m.findRoomSummary(chat.RoomID(roomID))
+	if !ok {
+		return nil
+	}
+	subscription, err := m.chatService.JoinRoom(m.ctx, selected.ID, m.member)
+	if err != nil {
+		return nil
+	}
+	return m.enterRoomView(selected, subscription)
+}
+
+func (m *model) createRoom(title string) tea.Cmd {
+	if m.view != viewManageRooms || m.chatService == nil {
+		return nil
+	}
+	userID, ok := m.currentChatUserID()
+	if !ok {
+		return nil
+	}
+	summary, err := m.chatService.CreateRoom(m.ctx, userID, title)
+	if err != nil {
+		return m.showCreateRoomError(createRoomErrorMessage(err))
+	}
+	subscription, err := m.chatService.JoinRoom(m.ctx, summary.ID, m.member)
+	if err != nil {
+		return m.showStandaloneView(viewMainMenu)
+	}
+	return m.enterRoomView(summary, subscription)
+}
+
+func (m *model) showCreateRoomError(message string) tea.Cmd {
+	var cmd tea.Cmd
+	m.ui, cmd = m.ui.Update(tui.CreateRoomFailed{Message: message})
+	return cmd
+}
+
+func createRoomErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, chat.ErrInvalidRoomTitle):
+		return "Room title must be 1-64 characters."
+	default:
+		return "Could not create room."
+	}
+}
+
+func (m model) findRoomSummary(roomID chat.RoomID) (chat.RoomSummary, bool) {
+	for _, room := range m.roomList {
+		if room.ID == roomID {
+			return room, true
+		}
+	}
+	return chat.RoomSummary{}, false
+}
+
+func (m *model) enterRoomView(room chat.RoomSummary, subscription *chat.Subscription) tea.Cmd {
+	if m.closed || subscription == nil {
 		return nil
 	}
 
 	m.closeRoomMembership()
+	m.activeRoomID = room.ID
+	m.activeRoomTitle = room.Title
+	m.subscription = subscription
 	m.view = viewChat
 	m.ui = m.newUI(viewChat)
-	m.subscription = m.room.Join(m.member)
 
 	return tea.Batch(m.ui.Init(), m.waitForRoomEvent())
 }
@@ -211,15 +287,16 @@ func (m *model) leaveRoomView() tea.Cmd {
 }
 
 func (m *model) closeRoomMembership() {
-	if m.subscription == nil {
-		return
+	if m.subscription != nil {
+		m.subscription.Close()
+		m.subscription = nil
 	}
-	m.subscription.Close()
-	m.subscription = nil
+	m.activeRoomID = ""
+	m.activeRoomTitle = ""
 }
 
 func (m model) inRoomView() bool {
-	return m.view == viewChat && m.subscription != nil
+	return m.view == viewChat && m.subscription != nil && m.activeRoomID != ""
 }
 
 func (m model) newUI(view viewState) tea.Model {
@@ -235,11 +312,22 @@ func (m model) newUI(view viewState) tea.Model {
 	case viewMainMenu:
 		return tui.NewMainMenu(config)
 	case viewMyChats:
-		config.Rooms = []tui.RoomListItem{{ID: townSquareRoomID, Title: "Town Square"}}
+		config.Rooms = roomListItems(m.roomList)
 		return tui.NewMyChats(config)
+	case viewManageRooms:
+		return tui.NewManageRooms(config)
 	case viewChat:
+		config.RoomTitle = m.activeRoomTitle
 		return tui.NewRoomView(config)
 	default:
 		return tui.NewWelcome(config)
 	}
+}
+
+func roomListItems(rooms []chat.RoomSummary) []tui.RoomListItem {
+	items := make([]tui.RoomListItem, 0, len(rooms))
+	for _, room := range rooms {
+		items = append(items, tui.RoomListItem{ID: string(room.ID), Title: room.Title})
+	}
+	return items
 }

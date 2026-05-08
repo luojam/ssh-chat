@@ -11,14 +11,14 @@ import (
 const (
 	mainMenuHeadingLine      = "MENU"
 	mainMenuMyChatsTitle     = "My Chats"
-	mainMenuManageChatsTitle = "+/-"
+	mainMenuManageRoomsTitle = "Manage Rooms"
 	mainMenuSettingsTitle    = "Settings"
 	mainMenuHintLine         = "←/→ • enter • esc back • ctrl+c quit"
 	mainMenuTargetBoxWidth   = 56
 	mainMenuTargetBoxHeight  = 12
 	mainMenuFramePaddingX    = 2
 	mainMenuFramePaddingY    = 1
-	mainMenuButtonGap        = 3
+	mainMenuButtonGap        = 1
 )
 
 var mainMenuHeaderLines = []string{
@@ -30,7 +30,7 @@ type mainMenuSection int
 
 const (
 	mainMenuSectionMyChats mainMenuSection = iota
-	mainMenuSectionManageChats
+	mainMenuSectionManageRooms
 	mainMenuSectionSettings
 )
 
@@ -186,7 +186,7 @@ func (m mainMenuModel) renderButtonRow(width int) string {
 
 var mainMenuItems = []mainMenuItem{
 	{section: mainMenuSectionMyChats, action: MainMenuActionMyChats, title: mainMenuMyChatsTitle},
-	{section: mainMenuSectionManageChats, action: MainMenuActionManageChats, title: mainMenuManageChatsTitle},
+	{section: mainMenuSectionManageRooms, action: MainMenuActionManageRooms, title: mainMenuManageRoomsTitle},
 	{section: mainMenuSectionSettings, action: MainMenuActionSettings, title: mainMenuSettingsTitle},
 }
 

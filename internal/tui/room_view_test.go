@@ -21,7 +21,7 @@ func TestInitialLayoutUsesFullFrame(t *testing.T) {
 			t.Fatalf("line %d width = %d, want 40; line = %q", i, got, line)
 		}
 	}
-	if !strings.Contains(lines[0], roomViewHeaderTitle) {
+	if !strings.Contains(lines[0], defaultRoomViewTitle) {
 		t.Fatalf("header should include app name, got %q", lines[0])
 	}
 	if strings.Contains(lines[0], "connected") || strings.Contains(lines[0], composerQuitHint) {

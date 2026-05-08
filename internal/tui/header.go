@@ -2,12 +2,12 @@ package tui
 
 import "strings"
 
-const roomViewHeaderTitle = "Town Square"
+const defaultRoomViewTitle = "Room"
 
 // renderHeader fills the full width with the chat title. Lip Gloss pads the
 // remainder with the header background color.
 func (m roomViewModel) renderHeader(width int) string {
-	return renderFullWidth(m.styles.headerTitle, width, roomViewHeaderTitle)
+	return renderFullWidth(m.styles.headerTitle, width, m.title)
 }
 
 // renderHeaderDivider creates a visual split between the title bar and feed.

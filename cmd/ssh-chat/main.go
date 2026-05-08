@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"net"
 	"os"
@@ -35,8 +33,6 @@ const (
 )
 
 func main() {
-	room := chat.NewRoom()
-
 	if err := os.MkdirAll("data", 0o700); err != nil {
 		log.Error("Could not create data directory", "error", err)
 		return
@@ -48,6 +44,7 @@ func main() {
 	}
 	defer db.Close()
 	authService := auth.NewPasswordService(sqlite.NewUserStore(db))
+	chatService := chat.NewService(sqlite.NewChatStore(db))
 
 	s, err := wish.NewServer(
 		wish.WithAddress(net.JoinHostPort(host, port)),
@@ -63,7 +60,7 @@ func main() {
 		// terminal, and only then starts one Bubble Tea program for the session.
 		wish.WithMiddleware(
 			bubbletea.Middleware(func(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
-				return teaHandler(sess, room, authService)
+				return teaHandler(sess, chatService, authService)
 			}),
 			activeterm.Middleware(),
 			logging.Middleware(),
@@ -92,17 +89,11 @@ func main() {
 	}
 }
 
-func teaHandler(sess ssh.Session, room *chat.Room, authService auth.Service) (tea.Model, []tea.ProgramOption) {
+func teaHandler(sess ssh.Session, chatService session.ChatService, authService auth.Service) (tea.Model, []tea.ProgramOption) {
 	pty, _, ok := sess.Pty()
 	if !ok {
 		// Wish's active-terminal middleware should reject this earlier, but keeping
 		// the handler defensive makes it safe even if middleware order changes.
-		return nil, nil
-	}
-
-	id, err := newSessionMemberID()
-	if err != nil {
-		log.Error("Could not create member ID", "error", err)
 		return nil, nil
 	}
 
@@ -112,14 +103,13 @@ func teaHandler(sess ssh.Session, room *chat.Room, authService auth.Service) (te
 		Width:             pty.Window.Width,
 		Height:            pty.Window.Height,
 		Context:           sess.Context(),
-		Room:              room,
+		ChatService:       chatService,
 		AuthService:       authService,
 		SSHPublicKey:      publicKey,
 		SSHKeyFingerprint: fingerprint,
-		// Room participant for this connection: new opaque ID each SSH session; display
-		// name from SSH login (see memberName). chat.Member is the shared shape only.
+		// Display name from SSH login is used only before app auth; authenticated
+		// user ID/name replace this before any room action is allowed.
 		Member: chat.Member{
-			ID:   id,
 			Name: memberName(sess),
 		},
 	}), []tea.ProgramOption{tea.WithContext(sess.Context())}
@@ -136,14 +126,6 @@ func sshKeyIdentityFromPublicKey(key ssh.PublicKey) (string, string) {
 	publicKey := strings.TrimSpace(string(gossh.MarshalAuthorizedKey(key)))
 	fingerprint := gossh.FingerprintSHA256(key)
 	return publicKey, fingerprint
-}
-
-func newSessionMemberID() (chat.MemberID, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
-	}
-	return chat.MemberID(hex.EncodeToString(b[:])), nil
 }
 
 func memberName(sess ssh.Session) string {

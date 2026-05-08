@@ -9,6 +9,7 @@ import (
 const (
 	myChatsTitle           = "My Chats"
 	myChatsHintLine        = "↑/↓ move • enter • esc back • ctrl+c quit"
+	myChatsEmptyState      = "No rooms yet. Go to Manage Rooms to create one."
 	myChatsTargetWidth     = 56
 	myChatsTargetHeight    = 20
 	myChatsListTargetWidth = 32
@@ -96,10 +97,18 @@ func (m *myChatsModel) resize(width, height int) {
 func (m myChatsModel) render() string {
 	layout := myChatsLayoutFor(m.screen.width, m.screen.height, m.styles)
 	listHeight := max(1, layout.listContent.height)
+	listContent := fitBlockHeight(m.list.View(), listHeight)
+	if len(m.list.Items()) == 0 {
+		listContent = lipgloss.NewStyle().
+			Width(layout.listContent.width).
+			Height(listHeight).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(wrapCenter(myChatsEmptyState, layout.listContent.width))
+	}
 	listBox := m.styles.listBorder.
 		Width(layout.listBox.width).
 		Height(layout.listBox.height).
-		Render(fitBlockHeight(m.list.View(), listHeight))
+		Render(listContent)
 
 	centeredListBox := lipgloss.NewStyle().
 		Width(layout.content.width).

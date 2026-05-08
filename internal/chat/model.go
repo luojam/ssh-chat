@@ -2,33 +2,71 @@ package chat
 
 import (
 	"errors"
-	"strings"
 	"sync"
 	"time"
 )
 
-var ErrEmptyMessage = errors.New("empty message")
+var (
+	ErrEmptyMessage     = errors.New("empty message")
+	ErrInvalidRoomTitle = errors.New("invalid room title")
+	ErrRoomNotFound     = errors.New("room not found")
+	ErrNotRoomMember    = errors.New("not room member")
+	ErrInvalidRoomRole  = errors.New("invalid room role")
+)
 
 const (
 	historyLimit       = 16
 	subscriptionBuffer = 16
+	maxRoomTitleRunes  = 64
 )
 
-// MemberID is an opaque room participant identifier. The SSH server assigns a
-// new ID per connection; it is not a durable user account ID unless you add that layer.
-type MemberID string
+type UserID string
 
-// Member is the chat package's name for "someone in the room": messages and join/leave
-// events reference it. Session code chooses which Member value applies to each SSH client.
+type RoomID string
+
+type MessageID int64
+
+type RoomRole string
+
+const (
+	RoomRoleOwner  RoomRole = "owner"
+	RoomRoleMember RoomRole = "member"
+)
+
+func ParseRoomRole(role string) (RoomRole, error) {
+	switch RoomRole(role) {
+	case RoomRoleOwner:
+		return RoomRoleOwner, nil
+	case RoomRoleMember:
+		return RoomRoleMember, nil
+	default:
+		return "", ErrInvalidRoomRole
+	}
+}
+
+type RoomSummary struct {
+	ID        RoomID
+	Title     string
+	Role      RoomRole
+	CreatedAt time.Time
+}
+
+type StoredRoom struct {
+	ID        RoomID
+	Title     string
+	CreatedBy UserID
+	CreatedAt time.Time
+}
+
+// Member is an authenticated user actively participating in a room through a session.
 type Member struct {
-	ID   MemberID
+	ID   UserID
 	Name string
 }
 
-type MessageID uint64
-
 type Message struct {
 	ID        MessageID
+	RoomID    RoomID
 	Author    Member
 	Body      string
 	CreatedAt time.Time
@@ -58,13 +96,14 @@ func (s *Subscription) Events() <-chan Event {
 }
 
 func (s *Subscription) Close() {
+	if s == nil || s.cancel == nil {
+		return
+	}
 	s.cancel()
 }
 
-type Room struct {
+type liveRoom struct {
 	mu          sync.Mutex
-	nextID      MessageID
-	messages    []Message
 	subscribers map[chan Event]subscriber
 }
 
@@ -72,35 +111,21 @@ type subscriber struct {
 	member Member
 }
 
-func NewRoom() *Room {
-	return &Room{
-		nextID:      1,
-		subscribers: make(map[chan Event]subscriber),
-	}
+func newLiveRoom() *liveRoom {
+	return &liveRoom{subscribers: make(map[chan Event]subscriber)}
 }
 
-// Join registers member in the room and returns their event stream. The stream
-// starts with recent message history; existing members are notified that member
-// joined, but the joining member does not receive their own MemberJoined event.
-func (r *Room) Join(member Member) *Subscription {
-	// Capacity includes replay plus live slack so a full history replay never makes
-	// a new member look slow before their session can read its first event.
+// joinLocked registers member in the live room and returns their event stream.
+// The caller must hold r.mu. The joining member receives recent history but not
+// their own MemberJoined event.
+func (r *liveRoom) joinLocked(member Member, history []Message) *Subscription {
 	events := make(chan Event, historyLimit+subscriptionBuffer)
-
-	r.mu.Lock()
-	history := r.history()
 	for _, msg := range history {
-		events <- Event{
-			Kind:    MessagePosted,
-			Message: msg,
-		}
+		events <- Event{Kind: MessagePosted, Message: msg}
 	}
-	r.broadcast(Event{
-		Kind:   MemberJoined,
-		Member: member,
-	})
+
+	r.broadcastLocked(Event{Kind: MemberJoined, Member: member})
 	r.subscribers[events] = subscriber{member: member}
-	r.mu.Unlock()
 
 	return &Subscription{
 		events: events,
@@ -114,51 +139,12 @@ func (r *Room) Join(member Member) *Subscription {
 			}
 			delete(r.subscribers, events)
 			close(events)
-			r.broadcast(Event{
-				Kind:   MemberLeft,
-				Member: subscriber.member,
-			})
+			r.broadcastLocked(Event{Kind: MemberLeft, Member: subscriber.member})
 		},
 	}
 }
 
-func (r *Room) Post(author Member, body string) (Message, error) {
-	body = strings.TrimSpace(body)
-	if body == "" {
-		return Message{}, ErrEmptyMessage
-	}
-
-	// A room is shared by many SSH sessions. The mutex keeps message storage and
-	// broadcast order together so subscribers see accepted messages in room order.
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	msg := Message{
-		ID:        r.nextID,
-		Author:    author,
-		Body:      body,
-		CreatedAt: time.Now(),
-	}
-	r.nextID++
-
-	event := Event{
-		Kind:    MessagePosted,
-		Message: msg,
-	}
-	r.messages = append(r.messages, msg)
-	r.broadcast(event)
-
-	return msg, nil
-}
-
-func (r *Room) history() []Message {
-	start := max(0, len(r.messages)-historyLimit)
-	history := make([]Message, len(r.messages[start:]))
-	copy(history, r.messages[start:])
-	return history
-}
-
-func (r *Room) broadcast(event Event) {
+func (r *liveRoom) broadcastLocked(event Event) {
 	for sub := range r.subscribers {
 		select {
 		case sub <- event:

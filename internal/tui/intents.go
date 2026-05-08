@@ -41,7 +41,7 @@ type MainMenuAction int
 
 const (
 	MainMenuActionMyChats MainMenuAction = iota
-	MainMenuActionManageChats
+	MainMenuActionManageRooms
 	MainMenuActionSettings
 )
 
@@ -60,6 +60,16 @@ type RoomSelected struct {
 // The Session performs any storage work; the TUI only reports the selected action.
 type LinkSSHKeySelectionRequested struct {
 	Link bool
+}
+
+// CreateRoomRequested asks the session to persist a new Room for the authenticated user.
+type CreateRoomRequested struct {
+	Title string
+}
+
+// CreateRoomFailed asks the Manage Rooms view to render a creation error supplied by Session.
+type CreateRoomFailed struct {
+	Message string
 }
 
 // LeaveRequested is emitted by the room view when the user chooses to leave the
@@ -93,6 +103,12 @@ func requestMainMenuSelection(action MainMenuAction) tea.Cmd {
 func requestRoomSelection(roomID string) tea.Cmd {
 	return func() tea.Msg {
 		return RoomSelected{RoomID: roomID}
+	}
+}
+
+func requestCreateRoom(title string) tea.Cmd {
+	return func() tea.Msg {
+		return CreateRoomRequested{Title: title}
 	}
 }
 

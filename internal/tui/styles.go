@@ -176,13 +176,13 @@ func newMainMenuStyles(isDark bool) mainMenuStyles {
 		hint:    lipgloss.NewStyle().Faint(true).Foreground(inactiveForeground),
 		button: lipgloss.NewStyle().
 			Foreground(inactiveForeground).
-			Padding(0, 2).
+			Padding(0, 1).
 			MarginRight(mainMenuButtonGap),
 		selectedButton: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(selectedForeground).
 			Background(selectedBackground).
-			Padding(0, 2).
+			Padding(0, 1).
 			MarginRight(mainMenuButtonGap),
 	}
 }

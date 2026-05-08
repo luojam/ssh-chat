@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -17,6 +19,7 @@ type Config struct {
 	Width             int
 	Height            int
 	Rooms             []RoomListItem
+	RoomTitle         string
 	SSHKeyFingerprint string
 }
 
@@ -27,10 +30,15 @@ type RoomListItem struct {
 
 func NewRoomView(config Config) tea.Model {
 	input, focusCmd := newComposer(true)
+	title := strings.TrimSpace(config.RoomTitle)
+	if title == "" {
+		title = defaultRoomViewTitle
+	}
 
 	m := roomViewModel{
 		screen:     newScreenState(config),
 		styles:     newBaseStyles(true),
+		title:      title,
 		input:      input,
 		viewport:   newMessageViewport(),
 		initialCmd: focusCmd,
@@ -43,6 +51,7 @@ type roomViewModel struct {
 	screen screenState
 
 	styles   baseStyles
+	title    string
 	input    textinput.Model
 	viewport viewport.Model
 	messages []message
