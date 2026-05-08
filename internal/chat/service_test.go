@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 )
 
 func TestServiceCreateRoomCreatesOwnerMembershipAndListsForUser(t *testing.T) {
@@ -123,6 +124,18 @@ func TestServiceJoinReplaysPersistedHistoryOldestFirst(t *testing.T) {
 		if event.Message.Body != fmt.Sprintf("message-%02d", i) {
 			t.Fatalf("history body = %q, want message-%02d", event.Message.Body, i)
 		}
+	}
+}
+
+func assertNextEvent(t *testing.T, subscription *Subscription) Event {
+	t.Helper()
+
+	select {
+	case event := <-subscription.Events():
+		return event
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for event")
+		return Event{}
 	}
 }
 

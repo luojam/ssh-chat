@@ -3,7 +3,9 @@ package session
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,10 +17,10 @@ import (
 
 func TestSendRequestedPostsToRoomAndRoomEventUpdatesTUI(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      8,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterChat(t, m)
 
@@ -43,10 +45,10 @@ func TestSendRequestedPostsToRoomAndRoomEventUpdatesTUI(t *testing.T) {
 
 func TestRoomEventMarksOtherMemberMessageAsRemote(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      8,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterChat(t, m)
 
@@ -72,10 +74,10 @@ func TestRoomEventMarksOtherMemberMessageAsRemote(t *testing.T) {
 
 func TestRoomEventUsesUnknownAuthorForEmptyMemberName(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      8,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterChat(t, m)
 
@@ -98,10 +100,10 @@ func TestRoomEventUsesUnknownAuthorForEmptyMemberName(t *testing.T) {
 
 func TestRoomEventUsesMemberIDForLocalAuthor(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      8,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterChat(t, m)
 
@@ -126,19 +128,19 @@ func TestRoomEventUsesMemberIDForLocalAuthor(t *testing.T) {
 }
 
 func TestRoomBroadcastReachesMultipleSessions(t *testing.T) {
-	room := chat.NewRoom()
+	chatService := newTestChatService()
 	user := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   room,
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      8,
+		ChatService: chatService,
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	user = enterChat(t, user)
 	sara := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   room,
-		Member: chat.Member{ID: "sara-1", Name: "sara"},
+		Width:       40,
+		Height:      8,
+		ChatService: chatService,
+		Member:      chat.Member{ID: "sara-1", Name: "sara"},
 	})
 	sara = enterChat(t, sara)
 
@@ -173,16 +175,16 @@ func TestRoomBroadcastReachesMultipleSessions(t *testing.T) {
 }
 
 func TestNewSessionCanRenderRoomHistory(t *testing.T) {
-	room := chat.NewRoom()
-	if _, err := room.Post(chat.Member{ID: "user-1", Name: "user"}, "before join"); err != nil {
+	chatService := newTestChatService()
+	if _, err := chatService.Post(context.Background(), testRoomID, chat.Member{ID: "user-1", Name: "user"}, "before join"); err != nil {
 		t.Fatalf("Post returned error: %v", err)
 	}
 
 	sara := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   room,
-		Member: chat.Member{ID: "sara-1", Name: "sara"},
+		Width:       40,
+		Height:      8,
+		ChatService: chatService,
+		Member:      chat.Member{ID: "sara-1", Name: "sara"},
 	})
 	sara = enterChat(t, sara)
 
@@ -197,20 +199,20 @@ func TestNewSessionCanRenderRoomHistory(t *testing.T) {
 }
 
 func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
-	room := chat.NewRoom()
+	chatService := newTestChatService()
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   room,
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      8,
+		ChatService: chatService,
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterChat(t, m)
 
 	sara := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   room,
-		Member: chat.Member{ID: "sara-1", Name: "sara"},
+		Width:       40,
+		Height:      8,
+		ChatService: chatService,
+		Member:      chat.Member{ID: "sara-1", Name: "sara"},
 	})
 	_ = enterChat(t, sara)
 
@@ -239,10 +241,10 @@ func TestMemberEventsRenderAsSystemMessages(t *testing.T) {
 
 func TestWelcomeContinueShowsAuth(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      8,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 
 	next, cmd := m.Update(tui.ContinueRequested{})
@@ -260,10 +262,10 @@ func TestWelcomeContinueShowsAuth(t *testing.T) {
 
 func TestAuthSubmissionShowsMainMenu(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      8,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterAuth(t, m)
 
@@ -286,7 +288,7 @@ func TestLinkedSSHKeyAtStartupAuthenticatesUserAndWelcomeContinueSkipsAuth(t *te
 	m := newModel(t, Config{
 		Width:             40,
 		Height:            8,
-		Room:              chat.NewRoom(),
+		ChatService:       newTestChatService(),
 		AuthService:       authService,
 		SSHPublicKey:      "ssh-ed25519 AAAA",
 		SSHKeyFingerprint: "SHA256:abc",
@@ -318,7 +320,7 @@ func TestPasswordAuthWithUnlinkedSSHKeyShowsLinkPromptAndYesLinks(t *testing.T) 
 	m := newModel(t, Config{
 		Width:             40,
 		Height:            12,
-		Room:              chat.NewRoom(),
+		ChatService:       newTestChatService(),
 		AuthService:       authService,
 		SSHPublicKey:      "ssh-ed25519 AAAA",
 		SSHKeyFingerprint: "SHA256:abc",
@@ -354,7 +356,7 @@ func TestPasswordAuthWithUnlinkedSSHKeyNoSkipsLinking(t *testing.T) {
 	m := newModel(t, Config{
 		Width:             40,
 		Height:            12,
-		Room:              chat.NewRoom(),
+		ChatService:       newTestChatService(),
 		AuthService:       authService,
 		SSHPublicKey:      "ssh-ed25519 AAAA",
 		SSHKeyFingerprint: "SHA256:abc",
@@ -381,7 +383,7 @@ func TestPasswordAuthWithoutSSHKeyShowsMainMenuDirectly(t *testing.T) {
 	m := newModel(t, Config{
 		Width:       40,
 		Height:      12,
-		Room:        chat.NewRoom(),
+		ChatService: newTestChatService(),
 		AuthService: newKeyAuthService(),
 		Member:      chat.Member{ID: "session-1", Name: "ssh-user"},
 	})
@@ -401,7 +403,7 @@ func TestFailedAuthSubmissionStaysOnAuth(t *testing.T) {
 	m := newModel(t, Config{
 		Width:       40,
 		Height:      14,
-		Room:        chat.NewRoom(),
+		ChatService: newTestChatService(),
 		Member:      chat.Member{ID: "session-1", Name: "ssh-user"},
 		AuthService: failingAuthService{err: auth.ErrInvalidCredentials},
 	})
@@ -425,10 +427,10 @@ func TestFailedAuthSubmissionStaysOnAuth(t *testing.T) {
 
 func TestAuthSubmissionStoresAuthenticatedUserAndMember(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "session-1", Name: "ssh-user"},
+		Width:       40,
+		Height:      8,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "session-1", Name: "ssh-user"},
 	})
 	m = enterAuth(t, m)
 
@@ -447,7 +449,7 @@ func TestSignupSubmissionUsesConfirmPassword(t *testing.T) {
 	m := newModel(t, Config{
 		Width:       40,
 		Height:      8,
-		Room:        chat.NewRoom(),
+		ChatService: newTestChatService(),
 		Member:      chat.Member{ID: "session-1", Name: "ssh-user"},
 		AuthService: &authService,
 	})
@@ -464,10 +466,10 @@ func TestSignupSubmissionUsesConfirmPassword(t *testing.T) {
 
 func TestBackFromAuthReturnsToWelcome(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 12,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterAuth(t, m)
 
@@ -486,10 +488,10 @@ func TestBackFromAuthReturnsToWelcome(t *testing.T) {
 
 func TestBackFromMainMenuReturnsToWelcomeAndKeepsAuth(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 12,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterMainMenu(t, m)
 
@@ -511,10 +513,10 @@ func TestBackFromMainMenuReturnsToWelcomeAndKeepsAuth(t *testing.T) {
 
 func TestAuthenticatedWelcomeContinueSkipsAuth(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 12,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterMainMenu(t, m)
 	next, _ := m.Update(tui.BackRequested{})
@@ -532,10 +534,10 @@ func TestAuthenticatedWelcomeContinueSkipsAuth(t *testing.T) {
 
 func TestAuthenticatedSessionCannotReturnToAuth(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 12,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterMainMenu(t, m)
 
@@ -550,10 +552,10 @@ func TestAuthenticatedSessionCannotReturnToAuth(t *testing.T) {
 
 func TestContinueFromMainMenuDoesNotJoinRoom(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 12,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterMainMenu(t, m)
 
@@ -572,10 +574,10 @@ func TestContinueFromMainMenuDoesNotJoinRoom(t *testing.T) {
 
 func TestMainMenuMyChatsSelectionShowsMyChats(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 12,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterMainMenu(t, m)
 
@@ -594,10 +596,10 @@ func TestMainMenuMyChatsSelectionShowsMyChats(t *testing.T) {
 
 func TestBackFromMyChatsReturnsToMainMenu(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 12,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterMainMenu(t, m)
 	next, _ := m.Update(tui.MainMenuSelectionRequested{Action: tui.MainMenuActionMyChats})
@@ -615,10 +617,10 @@ func TestBackFromMyChatsReturnsToMainMenu(t *testing.T) {
 
 func TestContinueFromMyChatsDoesNotStartChat(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 12,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterMyChats(t, m)
 
@@ -637,10 +639,10 @@ func TestContinueFromMyChatsDoesNotStartChat(t *testing.T) {
 
 func TestUnknownSelectedRoomFromMyChatsDoesNotStartChat(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 12,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterMyChats(t, m)
 
@@ -659,14 +661,14 @@ func TestUnknownSelectedRoomFromMyChatsDoesNotStartChat(t *testing.T) {
 
 func TestSelectedRoomFromMyChatsStartsChat(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 12,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterMyChats(t, m)
 
-	next, cmd := m.Update(tui.RoomSelected{RoomID: townSquareRoomID})
+	next, cmd := m.Update(tui.RoomSelected{RoomID: string(testRoomID)})
 	if cmd == nil {
 		t.Fatal("RoomSelected from My Chats should start the Room View")
 	}
@@ -680,21 +682,21 @@ func TestSelectedRoomFromMyChatsStartsChat(t *testing.T) {
 }
 
 func TestLeaveRequestedReturnsToMainMenuAndClosesSubscription(t *testing.T) {
-	room := chat.NewRoom()
+	chatService := newTestChatService()
 	user := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   room,
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      8,
+		ChatService: chatService,
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	user = enterChat(t, user)
 	oldSubscription := user.subscription
 
 	sara := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   room,
-		Member: chat.Member{ID: "sara-1", Name: "sara"},
+		Width:       40,
+		Height:      8,
+		ChatService: chatService,
+		Member:      chat.Member{ID: "sara-1", Name: "sara"},
 	})
 	sara = enterChat(t, sara)
 
@@ -720,10 +722,10 @@ func TestLeaveRequestedReturnsToMainMenuAndClosesSubscription(t *testing.T) {
 
 func TestStaleRoomEventIgnoredAfterLeavingChat(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      8,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterChat(t, m)
 	next, _ := m.Update(tui.LeaveRequested{})
@@ -747,10 +749,10 @@ func TestStaleRoomEventIgnoredAfterLeavingChat(t *testing.T) {
 
 func TestQuitRequestedClosesSubscriptionBeforeQuit(t *testing.T) {
 	m := newModel(t, Config{
-		Width:  40,
-		Height: 8,
-		Room:   chat.NewRoom(),
-		Member: chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      8,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterChat(t, m)
 	oldSubscription := m.subscription
@@ -778,11 +780,11 @@ func TestQuitRequestedClosesSubscriptionBeforeQuit(t *testing.T) {
 func TestWaitForRoomEventClosesSubscriptionOnContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := newModel(t, Config{
-		Width:   40,
-		Height:  8,
-		Context: ctx,
-		Room:    chat.NewRoom(),
-		Member:  chat.Member{ID: "user-1", Name: "user"},
+		Width:       40,
+		Height:      8,
+		Context:     ctx,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
 	})
 	m = enterChat(t, m)
 
@@ -791,6 +793,85 @@ func TestWaitForRoomEventClosesSubscriptionOnContextCancel(t *testing.T) {
 		t.Fatalf("wait command returned %T, want nil", msg)
 	}
 	assertSubscriptionClosed(t, m.subscription)
+}
+
+const testRoomID chat.RoomID = "town-square"
+
+func newTestChatService() *chat.Service {
+	store := &testChatStore{
+		rooms: map[chat.RoomID]chat.StoredRoom{
+			testRoomID: {ID: testRoomID, Title: "Town Square", CreatedBy: "system"},
+		},
+		messages:    map[chat.RoomID][]chat.Message{},
+		nextMessage: 1,
+	}
+	return chat.NewService(store)
+}
+
+type testChatStore struct {
+	mu          sync.Mutex
+	rooms       map[chat.RoomID]chat.StoredRoom
+	messages    map[chat.RoomID][]chat.Message
+	nextMessage chat.MessageID
+}
+
+func (s *testChatStore) CreateRoom(_ context.Context, room chat.StoredRoom, owner chat.UserID, role chat.RoomRole) (chat.RoomSummary, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.rooms[room.ID] = room
+	return chat.RoomSummary{ID: room.ID, Title: room.Title, Role: role, CreatedAt: room.CreatedAt}, nil
+}
+
+func (s *testChatStore) ListRoomsForUser(_ context.Context, userID chat.UserID) ([]chat.RoomSummary, error) {
+	if userID == "" {
+		return nil, chat.ErrNotRoomMember
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rooms := make([]chat.RoomSummary, 0, len(s.rooms))
+	for _, room := range s.rooms {
+		rooms = append(rooms, chat.RoomSummary{ID: room.ID, Title: room.Title, Role: chat.RoomRoleOwner, CreatedAt: room.CreatedAt})
+	}
+	sort.Slice(rooms, func(i, j int) bool { return rooms[i].ID < rooms[j].ID })
+	return rooms, nil
+}
+
+func (s *testChatStore) IsRoomMember(_ context.Context, roomID chat.RoomID, userID chat.UserID) (bool, error) {
+	if userID == "" {
+		return false, nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.rooms[roomID]
+	return ok, nil
+}
+
+func (s *testChatStore) StoreMessage(_ context.Context, message chat.Message) (chat.Message, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	message.ID = s.nextMessage
+	s.nextMessage++
+	s.messages[message.RoomID] = append(s.messages[message.RoomID], message)
+	return message, nil
+}
+
+func (s *testChatStore) RecentMessages(_ context.Context, roomID chat.RoomID, limit int) ([]chat.Message, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	messages := s.messages[roomID]
+	start := len(messages) - limit
+	if start < 0 {
+		start = 0
+	}
+	recent := make([]chat.Message, len(messages[start:]))
+	copy(recent, messages[start:])
+	return recent, nil
 }
 
 func newModel(t *testing.T, config Config) model {
@@ -854,7 +935,7 @@ func enterChat(t *testing.T, m model) model {
 	t.Helper()
 
 	m = enterMyChats(t, m)
-	next, cmd := m.Update(tui.RoomSelected{RoomID: townSquareRoomID})
+	next, cmd := m.Update(tui.RoomSelected{RoomID: string(testRoomID)})
 	if cmd == nil {
 		t.Fatal("RoomSelected from My Chats should return Room View startup command")
 	}

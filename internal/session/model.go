@@ -35,7 +35,6 @@ type Config struct {
 	Height            int
 	Context           context.Context
 	ChatService       ChatService
-	Room              *chat.Room // deprecated test compatibility; application code should pass ChatService.
 	AuthService       auth.Service
 	SSHPublicKey      string
 	SSHKeyFingerprint string
@@ -48,14 +47,9 @@ func New(config Config) tea.Model {
 		ctx = context.Background()
 	}
 
-	chatService := config.ChatService
-	if chatService == nil && config.Room != nil {
-		chatService = legacyRoomService{room: config.Room}
-	}
-
 	m := model{
 		ctx:                         ctx,
-		chatService:                 chatService,
+		chatService:                 config.ChatService,
 		authService:                 config.AuthService,
 		connectionSSHPublicKey:      config.SSHPublicKey,
 		connectionSSHKeyFingerprint: config.SSHKeyFingerprint,
