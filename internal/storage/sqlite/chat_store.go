@@ -148,6 +148,45 @@ func (s *ChatStore) JoinRoomByCode(ctx context.Context, joinCode string, userID 
 	return summary, nil
 }
 
+func (s *ChatStore) DeleteRoom(ctx context.Context, roomID chat.RoomID, requester chat.UserID) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var exists int
+	row := tx.QueryRowContext(ctx, `SELECT 1 FROM rooms WHERE id = ?`, roomID)
+	if err := row.Scan(&exists); errors.Is(err, sql.ErrNoRows) {
+		return chat.ErrRoomNotFound
+	} else if err != nil {
+		return err
+	}
+
+	var role string
+	row = tx.QueryRowContext(ctx,
+		`SELECT role FROM room_memberships WHERE room_id = ? AND user_id = ?`,
+		roomID, requester,
+	)
+	if err := row.Scan(&role); errors.Is(err, sql.ErrNoRows) {
+		return chat.ErrNotRoomOwner
+	} else if err != nil {
+		return err
+	}
+	parsedRole, err := chat.ParseRoomRole(role)
+	if err != nil {
+		return err
+	}
+	if parsedRole != chat.RoomRoleOwner {
+		return chat.ErrNotRoomOwner
+	}
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM rooms WHERE id = ?`, roomID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (s *ChatStore) IsRoomMember(ctx context.Context, roomID chat.RoomID, userID chat.UserID) (bool, error) {
 	var exists int
 	row := s.db.QueryRowContext(ctx,

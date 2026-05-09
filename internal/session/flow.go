@@ -34,6 +34,8 @@ func (m *model) applyFlowIntent(msg tea.Msg) tea.Cmd {
 		return m.createRoom(msg.Title)
 	case tui.JoinRoomRequested:
 		return m.joinRoomByCode(msg.JoinCode)
+	case tui.DeleteRoomRequested:
+		return m.deleteRoom(msg.RoomID)
 	case tui.LeaveRequested:
 		return m.leaveRoomView()
 	default:
@@ -161,10 +163,7 @@ func (m *model) openMainMenuSelection(action tui.MainMenuAction) tea.Cmd {
 	case tui.MainMenuActionMyChats:
 		return m.showMyChats()
 	case tui.MainMenuActionManageRooms:
-		if !m.isAuthenticated() {
-			return nil
-		}
-		return m.showStandaloneView(viewManageRooms)
+		return m.showManageRooms()
 	default:
 		return nil
 	}
@@ -196,16 +195,30 @@ func (m model) currentChatUserID() (chat.UserID, bool) {
 }
 
 func (m *model) showMyChats() tea.Cmd {
+	if !m.refreshRoomList() {
+		return nil
+	}
+	return m.showStandaloneView(viewMyChats)
+}
+
+func (m *model) showManageRooms() tea.Cmd {
+	if !m.refreshRoomList() {
+		return nil
+	}
+	return m.showStandaloneView(viewManageRooms)
+}
+
+func (m *model) refreshRoomList() bool {
 	userID, ok := m.currentChatUserID()
 	if !ok || m.chatService == nil {
-		return nil
+		return false
 	}
 	rooms, err := m.chatService.ListRoomsForUser(m.ctx, userID)
 	if err != nil {
-		return nil
+		return false
 	}
 	m.roomList = rooms
-	return m.showStandaloneView(viewMyChats)
+	return true
 }
 
 func (m *model) enterSelectedRoom(roomID string) tea.Cmd {
@@ -280,6 +293,29 @@ func (m *model) showJoinRoomError(message string) tea.Cmd {
 	return cmd
 }
 
+func (m *model) deleteRoom(roomID string) tea.Cmd {
+	if m.view != viewManageRooms || m.chatService == nil {
+		return nil
+	}
+	userID, ok := m.currentChatUserID()
+	if !ok {
+		return nil
+	}
+	id := chat.RoomID(roomID)
+	if err := m.chatService.DeleteRoom(m.ctx, id, userID); err != nil {
+		return m.showDeleteRoomError(deleteRoomErrorMessage(err))
+	}
+	m.removeRoomSummary(id)
+	m.ui = m.newUI(viewManageRooms)
+	return m.ui.Init()
+}
+
+func (m *model) showDeleteRoomError(message string) tea.Cmd {
+	var cmd tea.Cmd
+	m.ui, cmd = m.ui.Update(tui.DeleteRoomFailed{Message: message})
+	return cmd
+}
+
 func joinRoomErrorMessage(err error) string {
 	switch {
 	case errors.Is(err, chat.ErrInvalidJoinCode):
@@ -291,6 +327,17 @@ func joinRoomErrorMessage(err error) string {
 	}
 }
 
+func deleteRoomErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, chat.ErrNotRoomOwner):
+		return "Only room owners can delete rooms."
+	case errors.Is(err, chat.ErrRoomNotFound):
+		return "Room not found."
+	default:
+		return "Could not delete room."
+	}
+}
+
 func (m *model) upsertRoomSummary(summary chat.RoomSummary) {
 	for i, room := range m.roomList {
 		if room.ID == summary.ID {
@@ -299,6 +346,16 @@ func (m *model) upsertRoomSummary(summary chat.RoomSummary) {
 		}
 	}
 	m.roomList = append([]chat.RoomSummary{summary}, m.roomList...)
+}
+
+func (m *model) removeRoomSummary(roomID chat.RoomID) {
+	rooms := m.roomList[:0]
+	for _, room := range m.roomList {
+		if room.ID != roomID {
+			rooms = append(rooms, room)
+		}
+	}
+	m.roomList = rooms
 }
 
 func (m model) findRoomSummary(roomID chat.RoomID) (chat.RoomSummary, bool) {
@@ -363,6 +420,7 @@ func (m model) newUI(view viewState) tea.Model {
 		config.Rooms = roomListItems(m.roomList)
 		return tui.NewMyChats(config)
 	case viewManageRooms:
+		config.OwnedRooms = ownedRoomListItems(m.roomList)
 		return tui.NewManageRooms(config)
 	case viewChat:
 		config.RoomTitle = m.activeRoomTitle
@@ -377,6 +435,16 @@ func roomListItems(rooms []chat.RoomSummary) []tui.RoomListItem {
 	items := make([]tui.RoomListItem, 0, len(rooms))
 	for _, room := range rooms {
 		items = append(items, tui.RoomListItem{ID: string(room.ID), Title: room.Title})
+	}
+	return items
+}
+
+func ownedRoomListItems(rooms []chat.RoomSummary) []tui.RoomListItem {
+	items := make([]tui.RoomListItem, 0, len(rooms))
+	for _, room := range rooms {
+		if room.Role == chat.RoomRoleOwner {
+			items = append(items, tui.RoomListItem{ID: string(room.ID), Title: room.Title})
+		}
 	}
 	return items
 }

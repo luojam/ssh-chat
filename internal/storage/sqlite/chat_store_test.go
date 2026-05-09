@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -109,6 +110,27 @@ func TestChatStoreCreateListAndMessages(t *testing.T) {
 	}
 	if len(recent) != 1 || recent[0].Body != "second" {
 		t.Fatalf("recent = %+v, want newest limited message", recent)
+	}
+
+	if err := store.DeleteRoom(ctx, "room-1", "user-2"); !errors.Is(err, chat.ErrNotRoomOwner) {
+		t.Fatalf("member DeleteRoom error = %v, want ErrNotRoomOwner", err)
+	}
+	if err := store.DeleteRoom(ctx, "room-1", "user-1"); err != nil {
+		t.Fatalf("owner DeleteRoom returned error: %v", err)
+	}
+	rooms, err = store.ListRoomsForUser(ctx, "user-1")
+	if err != nil {
+		t.Fatalf("ListRoomsForUser after delete returned error: %v", err)
+	}
+	if len(rooms) != 0 {
+		t.Fatalf("rooms after delete = %+v, want none", rooms)
+	}
+	recent, err = store.RecentMessages(ctx, "room-1", 10)
+	if err != nil {
+		t.Fatalf("RecentMessages after delete returned error: %v", err)
+	}
+	if len(recent) != 0 {
+		t.Fatalf("messages after delete = %+v, want cascade delete", recent)
 	}
 }
 

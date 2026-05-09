@@ -726,6 +726,52 @@ func TestJoinRoomByCodeFailureStaysOnManageRooms(t *testing.T) {
 	}
 }
 
+func TestDeleteRoomFromManageRoomsRemovesRoomAndStaysInManageRooms(t *testing.T) {
+	m := newModel(t, Config{
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterManageRooms(t, m)
+
+	next, cmd := m.Update(tui.DeleteRoomRequested{RoomID: string(testRoomID)})
+	m = assertModel(t, next)
+	if cmd == nil {
+		t.Fatal("DeleteRoomRequested should refresh Manage Rooms UI")
+	}
+	if m.view != viewManageRooms {
+		t.Fatalf("view = %d, want viewManageRooms", m.view)
+	}
+	if len(m.roomList) != 0 {
+		t.Fatalf("roomList = %+v, want deleted room removed", m.roomList)
+	}
+	if strings.Contains(m.View().Content, "Town Square") {
+		t.Fatalf("Manage Rooms view should not include deleted owned room, got %q", m.View().Content)
+	}
+}
+
+func TestRoomDeletedEventReturnsActiveUserToMainMenu(t *testing.T) {
+	chatService := newTestChatService()
+	user := newModel(t, Config{
+		Width:       40,
+		Height:      8,
+		ChatService: chatService,
+		Member:      chat.Member{ID: "user-1", Name: "user"},
+	})
+	user = enterChat(t, user)
+
+	if err := chatService.DeleteRoom(context.Background(), testRoomID, "user-1-auth"); err != nil {
+		t.Fatalf("DeleteRoom returned error: %v", err)
+	}
+	event := nextRoomEvent(t, user.subscription, chat.RoomDeleted)
+	next, _ := user.Update(roomEvent{event: event})
+	user = assertModel(t, next)
+	if user.view != viewMainMenu || user.subscription != nil {
+		t.Fatalf("after RoomDeleted view = %d subscription nil? %v, want main menu and nil subscription", user.view, user.subscription == nil)
+	}
+}
+
 func TestLeaveRequestedReturnsToMainMenuAndClosesSubscription(t *testing.T) {
 	chatService := newTestChatService()
 	user := newModel(t, Config{
@@ -897,6 +943,21 @@ func (s *testChatStore) JoinRoomByCode(_ context.Context, joinCode string, userI
 		}
 	}
 	return chat.RoomSummary{}, chat.ErrRoomNotFound
+}
+
+func (s *testChatStore) DeleteRoom(_ context.Context, roomID chat.RoomID, requester chat.UserID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.rooms[roomID]; !ok {
+		return chat.ErrRoomNotFound
+	}
+	if requester == "" {
+		return chat.ErrNotRoomOwner
+	}
+	delete(s.rooms, roomID)
+	delete(s.messages, roomID)
+	return nil
 }
 
 func (s *testChatStore) IsRoomMember(_ context.Context, roomID chat.RoomID, userID chat.UserID) (bool, error) {

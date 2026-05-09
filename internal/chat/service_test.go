@@ -98,6 +98,40 @@ func TestServiceJoinRoomByCodeValidatesCode(t *testing.T) {
 	}
 }
 
+func TestServiceDeleteRoomRequiresOwnerAndBroadcastsDeletion(t *testing.T) {
+	service := NewService(newMemoryChatStore())
+
+	room, err := service.CreateRoom(context.Background(), "owner", "Room")
+	if err != nil {
+		t.Fatalf("CreateRoom returned error: %v", err)
+	}
+	if _, err := service.JoinRoomByCode(context.Background(), room.JoinCode, Member{ID: "user-2"}); err != nil {
+		t.Fatalf("JoinRoomByCode returned error: %v", err)
+	}
+	subscription, err := service.JoinRoom(context.Background(), room.ID, Member{ID: "user-2", Name: "bob"})
+	if err != nil {
+		t.Fatalf("JoinRoom returned error: %v", err)
+	}
+
+	if err := service.DeleteRoom(context.Background(), room.ID, "user-2"); !errors.Is(err, ErrNotRoomOwner) {
+		t.Fatalf("member DeleteRoom error = %v, want ErrNotRoomOwner", err)
+	}
+	if err := service.DeleteRoom(context.Background(), room.ID, "owner"); err != nil {
+		t.Fatalf("owner DeleteRoom returned error: %v", err)
+	}
+	select {
+	case event, ok := <-subscription.Events():
+		if !ok || event.Kind != RoomDeleted {
+			t.Fatalf("event = %+v ok %v, want RoomDeleted", event, ok)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for RoomDeleted")
+	}
+	if _, err := service.JoinRoom(context.Background(), room.ID, Member{ID: "owner"}); !errors.Is(err, ErrNotRoomMember) {
+		t.Fatalf("joining deleted room error = %v, want ErrNotRoomMember", err)
+	}
+}
+
 func TestServiceCreateRoomValidatesTitle(t *testing.T) {
 	service := NewService(newMemoryChatStore())
 
@@ -255,6 +289,20 @@ func (s *memoryChatStore) JoinRoomByCode(_ context.Context, joinCode string, use
 		return summary, nil
 	}
 	return RoomSummary{}, ErrRoomNotFound
+}
+
+func (s *memoryChatStore) DeleteRoom(_ context.Context, roomID RoomID, requester UserID) error {
+	room, ok := s.rooms[roomID]
+	if !ok || room.ID == "" {
+		return ErrRoomNotFound
+	}
+	if s.memberships[roomID][requester] != RoomRoleOwner {
+		return ErrNotRoomOwner
+	}
+	delete(s.rooms, roomID)
+	delete(s.memberships, roomID)
+	delete(s.messages, roomID)
+	return nil
 }
 
 func (s *memoryChatStore) IsRoomMember(_ context.Context, roomID RoomID, userID UserID) (bool, error) {

@@ -19,6 +19,7 @@ type Config struct {
 	Width             int
 	Height            int
 	Rooms             []RoomListItem
+	OwnedRooms        []RoomListItem
 	RoomTitle         string
 	RoomJoinCode      string
 	SSHKeyFingerprint string

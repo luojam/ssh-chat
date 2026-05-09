@@ -13,6 +13,7 @@ type Store interface {
 	CreateRoom(ctx context.Context, room StoredRoom, owner UserID, role RoomRole) (RoomSummary, error)
 	ListRoomsForUser(ctx context.Context, userID UserID) ([]RoomSummary, error)
 	JoinRoomByCode(ctx context.Context, joinCode string, userID UserID, role RoomRole) (RoomSummary, error)
+	DeleteRoom(ctx context.Context, roomID RoomID, requester UserID) error
 	IsRoomMember(ctx context.Context, roomID RoomID, userID UserID) (bool, error)
 	StoreMessage(ctx context.Context, message Message) (Message, error)
 	RecentMessages(ctx context.Context, roomID RoomID, limit int) ([]Message, error)
@@ -77,6 +78,17 @@ func (s *Service) JoinRoomByCode(ctx context.Context, joinCode string, member Me
 		return RoomSummary{}, ErrInvalidJoinCode
 	}
 	return s.store.JoinRoomByCode(ctx, joinCode, member.ID, RoomRoleMember)
+}
+
+func (s *Service) DeleteRoom(ctx context.Context, roomID RoomID, requester UserID) error {
+	if roomID == "" || requester == "" {
+		return ErrNotRoomOwner
+	}
+	if err := s.store.DeleteRoom(ctx, roomID, requester); err != nil {
+		return err
+	}
+	s.deleteLiveRoom(roomID)
+	return nil
 }
 
 func (s *Service) JoinRoom(ctx context.Context, roomID RoomID, member Member) (*Subscription, error) {
@@ -145,6 +157,22 @@ func (s *Service) liveRoom(roomID RoomID) *liveRoom {
 		s.liveRooms[roomID] = live
 	}
 	return live
+}
+
+func (s *Service) deleteLiveRoom(roomID RoomID) {
+	s.mu.Lock()
+	live, ok := s.liveRooms[roomID]
+	if ok {
+		delete(s.liveRooms, roomID)
+	}
+	s.mu.Unlock()
+	if !ok {
+		return
+	}
+
+	live.mu.Lock()
+	defer live.mu.Unlock()
+	live.deleteLocked()
 }
 
 func normalizeRoomTitle(title string) string {

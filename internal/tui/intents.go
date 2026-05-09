@@ -82,6 +82,19 @@ type JoinRoomFailed struct {
 	Message string
 }
 
+// DeleteRoomRequested asks the session to permanently delete an owned Room.
+type DeleteRoomRequested struct {
+	RoomID string
+}
+
+// DeleteRoomFailed asks the Manage Rooms view to render a deletion error supplied by Session.
+type DeleteRoomFailed struct {
+	Message string
+}
+
+// DeleteRoomSucceeded asks the Manage Rooms view to return to its action menu after deletion.
+type DeleteRoomSucceeded struct{}
+
 // LeaveRequested is emitted by the room view when the user chooses to leave the
 // room without quitting the SSH session.
 type LeaveRequested struct{}
@@ -125,6 +138,12 @@ func requestCreateRoom(title string) tea.Cmd {
 func requestJoinRoom(joinCode string) tea.Cmd {
 	return func() tea.Msg {
 		return JoinRoomRequested{JoinCode: joinCode}
+	}
+}
+
+func requestDeleteRoom(roomID string) tea.Cmd {
+	return func() tea.Msg {
+		return DeleteRoomRequested{RoomID: roomID}
 	}
 }
 

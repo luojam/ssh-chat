@@ -13,6 +13,7 @@ var (
 	ErrNotRoomMember    = errors.New("not room member")
 	ErrInvalidRoomRole  = errors.New("invalid room role")
 	ErrInvalidJoinCode  = errors.New("invalid join code")
+	ErrNotRoomOwner     = errors.New("not room owner")
 )
 
 const (
@@ -82,6 +83,7 @@ const (
 	MessagePosted EventKind = iota + 1
 	MemberJoined
 	MemberLeft
+	RoomDeleted
 )
 
 type Event struct {
@@ -145,6 +147,17 @@ func (r *liveRoom) joinLocked(member Member, history []Message) *Subscription {
 			close(events)
 			r.broadcastLocked(Event{Kind: MemberLeft, Member: subscriber.member})
 		},
+	}
+}
+
+func (r *liveRoom) deleteLocked() {
+	for sub := range r.subscribers {
+		select {
+		case sub <- Event{Kind: RoomDeleted}:
+		default:
+		}
+		delete(r.subscribers, sub)
+		close(sub)
 	}
 }
 
