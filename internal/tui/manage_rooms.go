@@ -331,7 +331,7 @@ func (m manageRoomsModel) render() string {
 
 func (m manageRoomsModel) renderBox(layout manageRoomsLayout) string {
 	sections := []string{
-		m.styles.heading.Render(wrapCenter(manageRoomsHeadingLine, layout.content.width)),
+		m.styles.heading.Render(wrapCenter(m.headingLine(), layout.content.width)),
 		"",
 	}
 	switch m.mode {
@@ -370,6 +370,19 @@ func (m manageRoomsModel) renderBox(layout manageRoomsLayout) string {
 		Width(layout.box.width).
 		Height(layout.box.height).
 		Render(content)
+}
+
+func (m manageRoomsModel) headingLine() string {
+	switch m.mode {
+	case manageRoomsModeCreate:
+		return manageRoomsCreateTitle
+	case manageRoomsModeJoin:
+		return manageRoomsJoinTitle
+	case manageRoomsModeDeleteConfirm:
+		return manageRoomsDeleteTitle
+	default:
+		return manageRoomsHeadingLine
+	}
 }
 
 func (m manageRoomsModel) renderButtonRow(width int) string {

@@ -55,6 +55,9 @@ func TestManageRoomsJoinRoomSubmissionAndFailure(t *testing.T) {
 	if m.mode != manageRoomsModeJoin {
 		t.Fatalf("mode = %d, want join", m.mode)
 	}
+	if !strings.Contains(m.View().Content, manageRoomsJoinTitle) || strings.Contains(m.View().Content, manageRoomsHeadingLine) {
+		t.Fatalf("join mode should use join title, got %q", m.View().Content)
+	}
 
 	for _, r := range "7kq9-m2xp" {
 		m = updateManageRoomsModel(t, m, keyText(string(r)))
@@ -161,6 +164,9 @@ func TestManageRoomsCreateRoomSubmissionAndFailure(t *testing.T) {
 	}
 	if m.mode != manageRoomsModeCreate {
 		t.Fatalf("mode = %d, want create", m.mode)
+	}
+	if !strings.Contains(m.View().Content, manageRoomsCreateTitle) || strings.Contains(m.View().Content, manageRoomsHeadingLine) {
+		t.Fatalf("create mode should use create title, got %q", m.View().Content)
 	}
 
 	m = updateManageRoomsModel(t, m, keyText("r"))
