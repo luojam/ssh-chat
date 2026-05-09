@@ -119,6 +119,28 @@ func TestManageRoomsDeleteRoomSelectionAndConfirmation(t *testing.T) {
 	}
 }
 
+func TestManageRoomsDeleteRoomListShowsMultipleRooms(t *testing.T) {
+	m := newManageRoomsModel(t, Config{
+		Width:  70,
+		Height: 20,
+		OwnedRooms: []RoomListItem{
+			{ID: "room-1", Title: "Project Room"},
+			{ID: "room-2", Title: "Design Room"},
+			{ID: "room-3", Title: "Ops Room"},
+		},
+	})
+	m = updateManageRoomsModel(t, m, keySpecial(tea.KeyRight))
+	m = updateManageRoomsModel(t, m, keySpecial(tea.KeyRight))
+	m = updateManageRoomsModel(t, m, keySpecial(tea.KeyEnter))
+
+	view := m.View().Content
+	for _, want := range []string{"Project Room", "Design Room", "Ops Room"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("delete room list missing %q, got %q", want, view)
+		}
+	}
+}
+
 func TestManageRoomsDeleteRoomEmptyState(t *testing.T) {
 	m := newManageRoomsModel(t, Config{Width: 70, Height: 20})
 	m = updateManageRoomsModel(t, m, keySpecial(tea.KeyRight))

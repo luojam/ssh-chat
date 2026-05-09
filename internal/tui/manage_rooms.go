@@ -11,23 +11,27 @@ import (
 )
 
 const (
-	manageRoomsHeadingLine      = "MANAGE ROOMS"
-	manageRoomsCreateTitle      = "Create Room"
-	manageRoomsJoinTitle        = "Join Room"
-	manageRoomsDeleteTitle      = "Delete Room"
-	manageRoomsRoomTitleLabel   = "Room title"
-	manageRoomsJoinCodeLabel    = "Join code"
-	manageRoomsDeleteEmptyState = "You don't own any rooms."
-	manageRoomsMenuHintLine     = "←/→ • enter • esc back • ctrl+c quit"
-	manageRoomsCreateHintLine   = "enter create • esc back • ctrl+c quit"
-	manageRoomsJoinHintLine     = "enter join • esc back • ctrl+c quit"
-	manageRoomsDeleteHintLine   = "↑/↓ • enter select • esc back • ctrl+c quit"
-	manageRoomsConfirmHintLine  = "←/→ • enter • esc cancel • ctrl+c quit"
-	manageRoomsTargetBoxWidth   = 60
-	manageRoomsTargetBoxHeight  = 18
-	manageRoomsFramePaddingX    = 2
-	manageRoomsFramePaddingY    = 1
-	manageRoomsButtonGap        = 3
+	manageRoomsHeadingLine           = "MANAGE ROOMS"
+	manageRoomsCreateTitle           = "Create Room"
+	manageRoomsJoinTitle             = "Join Room"
+	manageRoomsDeleteTitle           = "Delete Room"
+	manageRoomsRoomTitleLabel        = "Room title"
+	manageRoomsJoinCodeLabel         = "Join code"
+	manageRoomsDeleteEmptyState      = "You don't own any rooms."
+	manageRoomsMenuHintLine          = "←/→ • enter • esc back • ctrl+c quit"
+	manageRoomsCreateHintLine        = "enter create • esc back • ctrl+c quit"
+	manageRoomsJoinHintLine          = "enter join • esc back • ctrl+c quit"
+	manageRoomsDeleteHintLine        = "↑/↓ • enter select • esc back • ctrl+c quit"
+	manageRoomsConfirmHintLine       = "←/→ • enter • esc cancel • ctrl+c quit"
+	manageRoomsTargetBoxWidth        = 60
+	manageRoomsTargetBoxHeight       = 14
+	manageRoomsListTargetWidth       = 56
+	manageRoomsDeleteMaxVisibleRooms = 8
+	manageRoomsDeleteTitleHeight     = 2
+	manageRoomsDeleteFooterHeight    = 2
+	manageRoomsFramePaddingX         = 2
+	manageRoomsFramePaddingY         = 1
+	manageRoomsButtonGap             = 3
 )
 
 type manageRoomsMode int
@@ -57,6 +61,12 @@ type manageRoomsLayout struct {
 	frame   frameSize
 	box     frameSize
 	content frameSize
+}
+
+type manageRoomsListLayout struct {
+	frame   frameSize
+	content frameSize
+	list    frameSize
 }
 
 func NewManageRooms(config Config) tea.Model {
@@ -276,17 +286,18 @@ func (m *manageRoomsModel) setDark(isDark bool) {
 	m.styles = newAuthStyles(isDark)
 	m.listStyles = newMyChatsStyles(isDark)
 	m.input.SetStyles(inputStyles(isDark))
-	m.deleteList.SetDelegate(m.listStyles.listDelegate())
+	m.deleteList.SetDelegate(manageRoomsDeleteDelegate(m.listStyles))
 	m.deleteList.Styles = m.listStyles.listStyles(m.deleteList.Width())
+	m.deleteList.SetSize(m.deleteList.Width(), m.deleteList.Height())
 }
 
 func (m *manageRoomsModel) resize(width, height int) {
 	m.screen.resize(width, height)
 	layout := manageRoomsLayoutFor(width, height, m.styles)
 	m.input.SetWidth(m.fieldInputWidth(layout.content.width))
-	listHeight := max(1, layout.content.height-4)
-	m.deleteList.SetSize(layout.content.width, listHeight)
-	m.deleteList.Styles = m.listStyles.listStyles(layout.content.width)
+	listLayout := manageRoomsListLayoutFor(width, height, len(m.deleteList.Items()))
+	m.deleteList.Styles = m.listStyles.listStyles(listLayout.content.width)
+	m.deleteList.SetSize(listLayout.content.width, listLayout.list.height)
 }
 
 func (m *manageRoomsModel) focusInputIfNeeded() tea.Cmd {
@@ -307,6 +318,9 @@ func (m *manageRoomsModel) syncInputPlaceholder() {
 }
 
 func (m manageRoomsModel) render() string {
+	if m.mode == manageRoomsModeDelete {
+		return m.renderDeleteListView()
+	}
 	layout := manageRoomsLayoutFor(m.screen.width, m.screen.height, m.styles)
 	return lipgloss.NewStyle().
 		Width(layout.frame.width).
@@ -331,12 +345,6 @@ func (m manageRoomsModel) renderBox(layout manageRoomsLayout) string {
 			hint = manageRoomsJoinHintLine
 		}
 		sections = append(sections, "", m.styles.hint.Render(wrapCenter(hint, layout.content.width)))
-	case manageRoomsModeDelete:
-		sections = append(sections, m.renderDeleteList(layout.content.width, max(1, layout.content.height-4)))
-		if m.errorMessage != "" {
-			sections = append(sections, m.styles.error.Render(wrapCenter(m.errorMessage, layout.content.width)))
-		}
-		sections = append(sections, m.styles.hint.Render(wrapCenter(manageRoomsDeleteHintLine, layout.content.width)))
 	case manageRoomsModeDeleteConfirm:
 		sections = append(sections, m.renderDeleteConfirm(layout.content.width))
 		if m.errorMessage != "" {
@@ -390,15 +398,33 @@ func (m manageRoomsModel) renderInputForm(width int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, label, " ", input)
 }
 
-func (m manageRoomsModel) renderDeleteList(width, height int) string {
+func (m manageRoomsModel) renderDeleteListView() string {
+	layout := manageRoomsListLayoutFor(m.screen.width, m.screen.height, len(m.deleteList.Items()))
+	listContent := fitBlockHeight(m.deleteList.View(), layout.list.height)
 	if len(m.deleteList.Items()) == 0 {
-		return lipgloss.NewStyle().
-			Width(width).
-			Height(height).
+		listContent = lipgloss.NewStyle().
+			Width(layout.content.width).
+			Height(layout.list.height).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(wrapCenter(manageRoomsDeleteEmptyState, width))
+			Render(wrapCenter(manageRoomsDeleteEmptyState, layout.content.width))
 	}
-	return fitBlockHeight(m.deleteList.View(), height)
+
+	sections := []string{listContent}
+	if m.errorMessage != "" {
+		sections = append(sections, m.styles.error.Render(wrapCenter(m.errorMessage, layout.content.width)))
+	}
+	sections = append(sections, "", m.styles.hint.Width(layout.content.width).Align(lipgloss.Center).Render(manageRoomsDeleteHintLine))
+	content := lipgloss.JoinVertical(lipgloss.Left, sections...)
+	content = lipgloss.NewStyle().
+		Width(layout.content.width).
+		Height(layout.content.height).
+		Render(fitBlockHeight(content, layout.content.height))
+
+	return lipgloss.NewStyle().
+		Width(layout.frame.width).
+		Height(layout.frame.height).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render(content)
 }
 
 func (m manageRoomsModel) renderDeleteConfirm(width int) string {
@@ -428,7 +454,7 @@ func (m manageRoomsModel) inputLabel() string {
 }
 
 func newManageRoomsDeleteList(styles myChatsStyles, rooms []RoomListItem) list.Model {
-	l := list.New(myChatsRoomItems(rooms), styles.listDelegate(), 1, 1)
+	l := list.New(myChatsRoomItems(rooms), manageRoomsDeleteDelegate(styles), 1, 1)
 	l.Title = manageRoomsDeleteTitle
 	l.Styles = styles.listStyles(1)
 	l.SetFilteringEnabled(false)
@@ -438,6 +464,13 @@ func newManageRoomsDeleteList(styles myChatsStyles, rooms []RoomListItem) list.M
 	l.SetShowStatusBar(false)
 	l.DisableQuitKeybindings()
 	return l
+}
+
+func manageRoomsDeleteDelegate(styles myChatsStyles) list.DefaultDelegate {
+	delegate := styles.listDelegate()
+	delegate.SetSpacing(0)
+	delegate.ShowDescription = false
+	return delegate
 }
 
 var manageRoomsItems = []manageRoomsItem{
@@ -470,5 +503,23 @@ func manageRoomsBoxSize(frame frameSize, style lipgloss.Style) frameSize {
 	return frameSize{
 		width:  max(1, min(manageRoomsTargetBoxWidth, maxWidth)),
 		height: max(1, min(manageRoomsTargetBoxHeight, maxHeight)),
+	}
+}
+
+func manageRoomsListLayoutFor(width, height, itemCount int) manageRoomsListLayout {
+	frame := safeFrameSize(width, height)
+	visibleItems := min(max(1, itemCount), manageRoomsDeleteMaxVisibleRooms)
+	listHeight := manageRoomsDeleteTitleHeight + visibleItems
+	content := frameSize{
+		width:  max(1, min(manageRoomsListTargetWidth, frame.width-manageRoomsFramePaddingX*2)),
+		height: max(1, min(listHeight+manageRoomsDeleteFooterHeight, frame.height-manageRoomsFramePaddingY*2)),
+	}
+	return manageRoomsListLayout{
+		frame:   frame,
+		content: content,
+		list: frameSize{
+			width:  content.width,
+			height: min(listHeight, content.height),
+		},
 	}
 }

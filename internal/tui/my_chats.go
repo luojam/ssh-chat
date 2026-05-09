@@ -83,6 +83,7 @@ func (m *myChatsModel) setDark(isDark bool) {
 	m.styles = newMyChatsStyles(isDark)
 	m.list.SetDelegate(m.styles.listDelegate())
 	m.list.Styles = m.styles.listStyles(m.list.Width())
+	m.list.SetSize(m.list.Width(), m.list.Height())
 }
 
 func (m *myChatsModel) resize(width, height int) {
@@ -90,8 +91,8 @@ func (m *myChatsModel) resize(width, height int) {
 
 	layout := myChatsLayoutFor(width, height, m.styles)
 	listHeight := max(1, layout.listContent.height)
-	m.list.SetSize(layout.listContent.width, listHeight)
 	m.list.Styles = m.styles.listStyles(layout.listContent.width)
+	m.list.SetSize(layout.listContent.width, listHeight)
 }
 
 func (m myChatsModel) render() string {
