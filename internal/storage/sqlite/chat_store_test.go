@@ -58,6 +58,21 @@ func TestChatStoreCreateListAndMessages(t *testing.T) {
 		t.Fatalf("other user rooms = %+v, want redacted member join code", otherRooms)
 	}
 
+	joined, err := store.JoinRoomByCode(ctx, "7KQ9M2XP", "user-2", chat.RoomRoleMember)
+	if err != nil {
+		t.Fatalf("JoinRoomByCode existing member returned error: %v", err)
+	}
+	if joined.ID != "room-1" || joined.Role != chat.RoomRoleMember || joined.JoinCode != "" {
+		t.Fatalf("joined summary = %+v, want member without join code", joined)
+	}
+	ownerJoined, err := store.JoinRoomByCode(ctx, "7KQ9M2XP", "user-1", chat.RoomRoleMember)
+	if err != nil {
+		t.Fatalf("JoinRoomByCode owner returned error: %v", err)
+	}
+	if ownerJoined.Role != chat.RoomRoleOwner || ownerJoined.JoinCode != "7KQ9M2XP" {
+		t.Fatalf("owner joined summary = %+v, want owner with join code", ownerJoined)
+	}
+
 	isMember, err := store.IsRoomMember(ctx, "room-1", "user-1")
 	if err != nil {
 		t.Fatalf("IsRoomMember returned error: %v", err)

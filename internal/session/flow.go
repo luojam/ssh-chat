@@ -32,6 +32,8 @@ func (m *model) applyFlowIntent(msg tea.Msg) tea.Cmd {
 		return m.enterSelectedRoom(msg.RoomID)
 	case tui.CreateRoomRequested:
 		return m.createRoom(msg.Title)
+	case tui.JoinRoomRequested:
+		return m.joinRoomByCode(msg.JoinCode)
 	case tui.LeaveRequested:
 		return m.leaveRoomView()
 	default:
@@ -237,6 +239,23 @@ func (m *model) createRoom(title string) tea.Cmd {
 	if err != nil {
 		return m.showStandaloneView(viewMainMenu)
 	}
+	m.upsertRoomSummary(summary)
+	return m.enterRoomView(summary, subscription)
+}
+
+func (m *model) joinRoomByCode(joinCode string) tea.Cmd {
+	if m.view != viewManageRooms || m.chatService == nil || !m.isAuthenticated() {
+		return nil
+	}
+	summary, err := m.chatService.JoinRoomByCode(m.ctx, joinCode, m.member)
+	if err != nil {
+		return m.showJoinRoomError(joinRoomErrorMessage(err))
+	}
+	subscription, err := m.chatService.JoinRoom(m.ctx, summary.ID, m.member)
+	if err != nil {
+		return m.showJoinRoomError(joinRoomErrorMessage(err))
+	}
+	m.upsertRoomSummary(summary)
 	return m.enterRoomView(summary, subscription)
 }
 
@@ -253,6 +272,33 @@ func createRoomErrorMessage(err error) string {
 	default:
 		return "Could not create room."
 	}
+}
+
+func (m *model) showJoinRoomError(message string) tea.Cmd {
+	var cmd tea.Cmd
+	m.ui, cmd = m.ui.Update(tui.JoinRoomFailed{Message: message})
+	return cmd
+}
+
+func joinRoomErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, chat.ErrInvalidJoinCode):
+		return "Join code must be 8 letters/numbers, with optional hyphen."
+	case errors.Is(err, chat.ErrRoomNotFound):
+		return "Invalid join code."
+	default:
+		return "Could not join room."
+	}
+}
+
+func (m *model) upsertRoomSummary(summary chat.RoomSummary) {
+	for i, room := range m.roomList {
+		if room.ID == summary.ID {
+			m.roomList[i] = summary
+			return
+		}
+	}
+	m.roomList = append([]chat.RoomSummary{summary}, m.roomList...)
 }
 
 func (m model) findRoomSummary(roomID chat.RoomID) (chat.RoomSummary, bool) {

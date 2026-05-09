@@ -12,6 +12,7 @@ var (
 	ErrRoomNotFound     = errors.New("room not found")
 	ErrNotRoomMember    = errors.New("not room member")
 	ErrInvalidRoomRole  = errors.New("invalid room role")
+	ErrInvalidJoinCode  = errors.New("invalid join code")
 )
 
 const (

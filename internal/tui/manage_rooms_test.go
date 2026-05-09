@@ -42,18 +42,39 @@ func TestManageRoomsArrowKeysMoveSelectionButHLDoNot(t *testing.T) {
 	}
 }
 
-func TestManageRoomsJoinRoomSelectionIsNoOp(t *testing.T) {
+func TestManageRoomsJoinRoomSubmissionAndFailure(t *testing.T) {
 	m := newManageRoomsModel(t, Config{Width: 70, Height: 16})
 	next, _ := m.Update(keySpecial(tea.KeyRight))
 	m = next.(manageRoomsModel)
 
 	next, cmd := m.Update(keySpecial(tea.KeyEnter))
 	m = next.(manageRoomsModel)
-	if cmd != nil {
-		t.Fatal("enter on Join Room placeholder should not return command")
+	if cmd == nil {
+		t.Fatal("enter on Join Room should focus input")
 	}
-	if m.mode != manageRoomsModeMenu || m.selectedIndex != 1 {
-		t.Fatalf("join no-op changed model: mode %d index %d", m.mode, m.selectedIndex)
+	if m.mode != manageRoomsModeJoin {
+		t.Fatalf("mode = %d, want join", m.mode)
+	}
+
+	for _, r := range "7kq9-m2xp" {
+		m = updateManageRoomsModel(t, m, keyText(string(r)))
+	}
+	_, cmd = m.Update(keySpecial(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("enter in join mode should request join")
+	}
+	msg, ok := cmd().(JoinRoomRequested)
+	if !ok {
+		t.Fatalf("command returned %T, want JoinRoomRequested", cmd())
+	}
+	if msg.JoinCode != "7kq9-m2xp" {
+		t.Fatalf("join code = %q, want entered code", msg.JoinCode)
+	}
+
+	next, _ = m.Update(JoinRoomFailed{Message: "Invalid join code."})
+	m = next.(manageRoomsModel)
+	if m.mode != manageRoomsModeJoin || !strings.Contains(m.View().Content, "Invalid join code.") {
+		t.Fatalf("failure should preserve join mode and render error, got mode %d view %q", m.mode, m.View().Content)
 	}
 }
 

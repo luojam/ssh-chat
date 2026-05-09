@@ -72,6 +72,16 @@ type CreateRoomFailed struct {
 	Message string
 }
 
+// JoinRoomRequested asks the session to add the authenticated user to a Room by invite code.
+type JoinRoomRequested struct {
+	JoinCode string
+}
+
+// JoinRoomFailed asks the Manage Rooms view to render a join error supplied by Session.
+type JoinRoomFailed struct {
+	Message string
+}
+
 // LeaveRequested is emitted by the room view when the user chooses to leave the
 // room without quitting the SSH session.
 type LeaveRequested struct{}
@@ -109,6 +119,12 @@ func requestRoomSelection(roomID string) tea.Cmd {
 func requestCreateRoom(title string) tea.Cmd {
 	return func() tea.Msg {
 		return CreateRoomRequested{Title: title}
+	}
+}
+
+func requestJoinRoom(joinCode string) tea.Cmd {
+	return func() tea.Msg {
+		return JoinRoomRequested{JoinCode: joinCode}
 	}
 }
 

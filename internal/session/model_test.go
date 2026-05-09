@@ -681,6 +681,51 @@ func TestSelectedRoomFromMyChatsStartsChat(t *testing.T) {
 	}
 }
 
+func TestJoinRoomByCodeFromManageRoomsStartsChatAndUpdatesRoomList(t *testing.T) {
+	m := newModel(t, Config{
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "sara-1", Name: "sara"},
+	})
+	m = enterManageRooms(t, m)
+
+	next, cmd := m.Update(tui.JoinRoomRequested{JoinCode: "7kq9-m2xp"})
+	if cmd == nil {
+		t.Fatal("JoinRoomRequested from Manage Rooms should start Room View")
+	}
+	m = assertModel(t, next)
+	if m.view != viewChat || m.subscription == nil || m.activeRoomID != testRoomID {
+		t.Fatalf("model after join = view %d subscription nil? %v room %q", m.view, m.subscription == nil, m.activeRoomID)
+	}
+	if len(m.roomList) == 0 || m.roomList[0].ID != testRoomID {
+		t.Fatalf("roomList = %+v, want joined room", m.roomList)
+	}
+}
+
+func TestJoinRoomByCodeFailureStaysOnManageRooms(t *testing.T) {
+	m := newModel(t, Config{
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "sara-1", Name: "sara"},
+	})
+	m = enterManageRooms(t, m)
+
+	next, cmd := m.Update(tui.JoinRoomRequested{JoinCode: "bad"})
+	if cmd == nil {
+		t.Fatal("failed join should update Manage Rooms with an error")
+	}
+	m = assertModel(t, next)
+	if m.view != viewManageRooms || m.subscription != nil {
+		t.Fatalf("failed join changed state: view %d subscription nil? %v", m.view, m.subscription == nil)
+	}
+	view := m.View().Content
+	if !strings.Contains(view, "Join code must be 8") || !strings.Contains(view, "letters/numbers, with") || !strings.Contains(view, "optional hyphen.") {
+		t.Fatalf("failed join should render validation error, got %q", view)
+	}
+}
+
 func TestLeaveRequestedReturnsToMainMenuAndClosesSubscription(t *testing.T) {
 	chatService := newTestChatService()
 	user := newModel(t, Config{
@@ -839,6 +884,21 @@ func (s *testChatStore) ListRoomsForUser(_ context.Context, userID chat.UserID) 
 	return rooms, nil
 }
 
+func (s *testChatStore) JoinRoomByCode(_ context.Context, joinCode string, userID chat.UserID, role chat.RoomRole) (chat.RoomSummary, error) {
+	if userID == "" {
+		return chat.RoomSummary{}, chat.ErrNotRoomMember
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, room := range s.rooms {
+		if room.JoinCode == joinCode {
+			return chat.RoomSummary{ID: room.ID, Title: room.Title, Role: role, CreatedAt: room.CreatedAt}, nil
+		}
+	}
+	return chat.RoomSummary{}, chat.ErrRoomNotFound
+}
+
 func (s *testChatStore) IsRoomMember(_ context.Context, roomID chat.RoomID, userID chat.UserID) (bool, error) {
 	if userID == "" {
 		return false, nil
@@ -963,6 +1023,22 @@ func enterMyChats(t *testing.T, m model) model {
 	m = assertModel(t, next)
 	if m.view != viewMyChats {
 		t.Fatalf("view = %d, want viewMyChats", m.view)
+	}
+	return m
+}
+
+func enterManageRooms(t *testing.T, m model) model {
+	t.Helper()
+
+	m = enterMainMenu(t, m)
+	next, cmd := m.Update(tui.MainMenuSelectionRequested{Action: tui.MainMenuActionManageRooms})
+	if cmd == nil {
+		t.Fatal("Manage Rooms selection should return Manage Rooms startup command")
+	}
+
+	m = assertModel(t, next)
+	if m.view != viewManageRooms {
+		t.Fatalf("view = %d, want viewManageRooms", m.view)
 	}
 	return m
 }

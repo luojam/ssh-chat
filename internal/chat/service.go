@@ -12,6 +12,7 @@ import (
 type Store interface {
 	CreateRoom(ctx context.Context, room StoredRoom, owner UserID, role RoomRole) (RoomSummary, error)
 	ListRoomsForUser(ctx context.Context, userID UserID) ([]RoomSummary, error)
+	JoinRoomByCode(ctx context.Context, joinCode string, userID UserID, role RoomRole) (RoomSummary, error)
 	IsRoomMember(ctx context.Context, roomID RoomID, userID UserID) (bool, error)
 	StoreMessage(ctx context.Context, message Message) (Message, error)
 	RecentMessages(ctx context.Context, roomID RoomID, limit int) ([]Message, error)
@@ -65,6 +66,17 @@ func (s *Service) ListRoomsForUser(ctx context.Context, userID UserID) ([]RoomSu
 		return nil, ErrNotRoomMember
 	}
 	return s.store.ListRoomsForUser(ctx, userID)
+}
+
+func (s *Service) JoinRoomByCode(ctx context.Context, joinCode string, member Member) (RoomSummary, error) {
+	if member.ID == "" {
+		return RoomSummary{}, ErrNotRoomMember
+	}
+	joinCode = normalizeJoinCode(joinCode)
+	if !validJoinCode(joinCode) {
+		return RoomSummary{}, ErrInvalidJoinCode
+	}
+	return s.store.JoinRoomByCode(ctx, joinCode, member.ID, RoomRoleMember)
 }
 
 func (s *Service) JoinRoom(ctx context.Context, roomID RoomID, member Member) (*Subscription, error) {
@@ -163,9 +175,25 @@ func newJoinCode() (string, error) {
 }
 
 func FormatJoinCode(code string) string {
-	code = strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(code), "-", ""))
+	code = normalizeJoinCode(code)
 	if len(code) != joinCodeLength {
 		return code
 	}
 	return code[:4] + "-" + code[4:]
+}
+
+func normalizeJoinCode(code string) string {
+	return strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(code), "-", ""))
+}
+
+func validJoinCode(code string) bool {
+	if len(code) != joinCodeLength {
+		return false
+	}
+	for _, r := range code {
+		if (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
+			return false
+		}
+	}
+	return true
 }

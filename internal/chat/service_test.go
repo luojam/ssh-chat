@@ -46,6 +46,58 @@ func TestServiceCreateRoomCreatesOwnerMembershipAndListsForUser(t *testing.T) {
 	}
 }
 
+func TestServiceJoinRoomByCodeAddsMemberAndRedactsCode(t *testing.T) {
+	store := newMemoryChatStore()
+	service := NewService(store)
+
+	room, err := service.CreateRoom(context.Background(), "owner", "Room")
+	if err != nil {
+		t.Fatalf("CreateRoom returned error: %v", err)
+	}
+	joined, err := service.JoinRoomByCode(context.Background(), " "+FormatJoinCode(room.JoinCode)+" ", Member{ID: "user-2", Name: "bob"})
+	if err != nil {
+		t.Fatalf("JoinRoomByCode returned error: %v", err)
+	}
+	if joined.ID != room.ID || joined.Role != RoomRoleMember || joined.JoinCode != "" {
+		t.Fatalf("joined summary = %+v, want member without join code", joined)
+	}
+
+	subscription, err := service.JoinRoom(context.Background(), room.ID, Member{ID: "user-2", Name: "bob"})
+	if err != nil {
+		t.Fatalf("joined user should be able to enter room: %v", err)
+	}
+	subscription.Close()
+}
+
+func TestServiceJoinRoomByCodeOwnerIsIdempotent(t *testing.T) {
+	service := NewService(newMemoryChatStore())
+
+	room, err := service.CreateRoom(context.Background(), "owner", "Room")
+	if err != nil {
+		t.Fatalf("CreateRoom returned error: %v", err)
+	}
+	joined, err := service.JoinRoomByCode(context.Background(), room.JoinCode, Member{ID: "owner", Name: "alice"})
+	if err != nil {
+		t.Fatalf("JoinRoomByCode returned error: %v", err)
+	}
+	if joined.Role != RoomRoleOwner || joined.JoinCode != room.JoinCode {
+		t.Fatalf("owner joined summary = %+v, want owner with join code", joined)
+	}
+}
+
+func TestServiceJoinRoomByCodeValidatesCode(t *testing.T) {
+	service := NewService(newMemoryChatStore())
+
+	_, err := service.JoinRoomByCode(context.Background(), "bad", Member{ID: "user-1"})
+	if !errors.Is(err, ErrInvalidJoinCode) {
+		t.Fatalf("short code error = %v, want ErrInvalidJoinCode", err)
+	}
+	_, err = service.JoinRoomByCode(context.Background(), "ABCDEFGH", Member{ID: "user-1"})
+	if !errors.Is(err, ErrRoomNotFound) {
+		t.Fatalf("unknown code error = %v, want ErrRoomNotFound", err)
+	}
+}
+
 func TestServiceCreateRoomValidatesTitle(t *testing.T) {
 	service := NewService(newMemoryChatStore())
 
@@ -182,6 +234,27 @@ func (s *memoryChatStore) ListRoomsForUser(_ context.Context, userID UserID) ([]
 		rooms = append(rooms, summary)
 	}
 	return rooms, nil
+}
+
+func (s *memoryChatStore) JoinRoomByCode(_ context.Context, joinCode string, userID UserID, role RoomRole) (RoomSummary, error) {
+	for roomID, room := range s.rooms {
+		if room.JoinCode != joinCode {
+			continue
+		}
+		if s.memberships[roomID] == nil {
+			s.memberships[roomID] = map[UserID]RoomRole{}
+		}
+		if _, ok := s.memberships[roomID][userID]; !ok {
+			s.memberships[roomID][userID] = role
+		}
+		storedRole := s.memberships[roomID][userID]
+		summary := RoomSummary{ID: room.ID, Title: room.Title, Role: storedRole, CreatedAt: room.CreatedAt}
+		if storedRole == RoomRoleOwner {
+			summary.JoinCode = room.JoinCode
+		}
+		return summary, nil
+	}
+	return RoomSummary{}, ErrRoomNotFound
 }
 
 func (s *memoryChatStore) IsRoomMember(_ context.Context, roomID RoomID, userID UserID) (bool, error) {

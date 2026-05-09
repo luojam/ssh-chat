@@ -24,6 +24,7 @@ const (
 type ChatService interface {
 	CreateRoom(ctx context.Context, creator chat.UserID, title string) (chat.RoomSummary, error)
 	ListRoomsForUser(ctx context.Context, userID chat.UserID) ([]chat.RoomSummary, error)
+	JoinRoomByCode(ctx context.Context, joinCode string, member chat.Member) (chat.RoomSummary, error)
 	JoinRoom(ctx context.Context, roomID chat.RoomID, member chat.Member) (*chat.Subscription, error)
 	Post(ctx context.Context, roomID chat.RoomID, author chat.Member, body string) (chat.Message, error)
 }
@@ -105,7 +106,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tui.QuitRequested:
 		m.close()
 		return m, tea.Quit
-	case tui.ContinueRequested, tui.BackRequested, tui.AuthSubmissionRequested, tui.LinkSSHKeySelectionRequested, tui.MainMenuSelectionRequested, tui.RoomSelected, tui.CreateRoomRequested, tui.LeaveRequested:
+	case tui.ContinueRequested, tui.BackRequested, tui.AuthSubmissionRequested, tui.LinkSSHKeySelectionRequested, tui.MainMenuSelectionRequested, tui.RoomSelected, tui.CreateRoomRequested, tui.JoinRoomRequested, tui.LeaveRequested:
 		return m, m.applyFlowIntent(msg)
 	case tui.SendRequested:
 		return m, m.postMessage(msg.Body)

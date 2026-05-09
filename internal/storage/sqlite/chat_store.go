@@ -95,6 +95,59 @@ func (s *ChatStore) ListRoomsForUser(ctx context.Context, userID chat.UserID) ([
 	return rooms, nil
 }
 
+func (s *ChatStore) JoinRoomByCode(ctx context.Context, joinCode string, userID chat.UserID, role chat.RoomRole) (chat.RoomSummary, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return chat.RoomSummary{}, err
+	}
+	defer tx.Rollback()
+
+	var room chat.StoredRoom
+	var createdAt string
+	row := tx.QueryRowContext(ctx,
+		`SELECT id, title, join_code, created_by, created_at FROM rooms WHERE join_code = ?`,
+		joinCode,
+	)
+	if err := row.Scan(&room.ID, &room.Title, &room.JoinCode, &room.CreatedBy, &createdAt); errors.Is(err, sql.ErrNoRows) {
+		return chat.RoomSummary{}, chat.ErrRoomNotFound
+	} else if err != nil {
+		return chat.RoomSummary{}, err
+	}
+	room.CreatedAt, err = parseTime(createdAt)
+	if err != nil {
+		return chat.RoomSummary{}, err
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		`INSERT OR IGNORE INTO room_memberships (room_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`,
+		room.ID, userID, role, formatTime(time.Now().UTC()),
+	); err != nil {
+		return chat.RoomSummary{}, err
+	}
+
+	var storedRole string
+	row = tx.QueryRowContext(ctx,
+		`SELECT role FROM room_memberships WHERE room_id = ? AND user_id = ?`,
+		room.ID, userID,
+	)
+	if err := row.Scan(&storedRole); err != nil {
+		return chat.RoomSummary{}, err
+	}
+	parsedRole, err := chat.ParseRoomRole(storedRole)
+	if err != nil {
+		return chat.RoomSummary{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return chat.RoomSummary{}, err
+	}
+
+	summary := chat.RoomSummary{ID: room.ID, Title: room.Title, Role: parsedRole, CreatedAt: room.CreatedAt}
+	if parsedRole == chat.RoomRoleOwner {
+		summary.JoinCode = room.JoinCode
+	}
+	return summary, nil
+}
+
 func (s *ChatStore) IsRoomMember(ctx context.Context, roomID chat.RoomID, userID chat.UserID) (bool, error) {
 	var exists int
 	row := s.db.QueryRowContext(ctx,

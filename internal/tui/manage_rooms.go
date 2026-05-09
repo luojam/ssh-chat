@@ -14,8 +14,10 @@ const (
 	manageRoomsCreateTitle     = "Create Room"
 	manageRoomsJoinTitle       = "Join Room"
 	manageRoomsRoomTitleLabel  = "Room title"
+	manageRoomsJoinCodeLabel   = "Join code"
 	manageRoomsMenuHintLine    = "←/→ • enter • esc back • ctrl+c quit"
 	manageRoomsCreateHintLine  = "enter create • esc back • ctrl+c quit"
+	manageRoomsJoinHintLine    = "enter join • esc back • ctrl+c quit"
 	manageRoomsTargetBoxWidth  = 60
 	manageRoomsTargetBoxHeight = 14
 	manageRoomsFramePaddingX   = 2
@@ -28,6 +30,7 @@ type manageRoomsMode int
 const (
 	manageRoomsModeMenu manageRoomsMode = iota
 	manageRoomsModeCreate
+	manageRoomsModeJoin
 )
 
 type manageRoomsSection int
@@ -92,6 +95,12 @@ func (m manageRoomsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case CreateRoomFailed:
 		m.mode = manageRoomsModeCreate
 		m.errorMessage = msg.Message
+		m.syncInputPlaceholder()
+		return m, m.input.Focus()
+	case JoinRoomFailed:
+		m.mode = manageRoomsModeJoin
+		m.errorMessage = msg.Message
+		m.syncInputPlaceholder()
 		return m, m.input.Focus()
 	case tea.KeyPressMsg:
 		if handled, cmd := m.handleKeyPress(msg); handled {
@@ -99,7 +108,7 @@ func (m manageRoomsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if m.mode != manageRoomsModeCreate {
+	if m.mode != manageRoomsModeCreate && m.mode != manageRoomsModeJoin {
 		return m, nil
 	}
 	if _, ok := msg.(tea.KeyPressMsg); ok {
@@ -111,7 +120,7 @@ func (m manageRoomsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *manageRoomsModel) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
-	if m.mode == manageRoomsModeCreate {
+	if m.mode == manageRoomsModeCreate || m.mode == manageRoomsModeJoin {
 		switch msg.String() {
 		case keyQuit:
 			return true, requestQuit
@@ -121,7 +130,11 @@ func (m *manageRoomsModel) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 			m.input.Blur()
 			return true, nil
 		case keySend:
-			return true, requestCreateRoom(strings.TrimSpace(m.input.Value()))
+			value := strings.TrimSpace(m.input.Value())
+			if m.mode == manageRoomsModeJoin {
+				return true, requestJoinRoom(value)
+			}
+			return true, requestCreateRoom(value)
 		default:
 			return false, nil
 		}
@@ -153,11 +166,17 @@ func (m *manageRoomsModel) selectNext() {
 }
 
 func (m *manageRoomsModel) selectCurrent() tea.Cmd {
-	if manageRoomsItems[m.selectedIndex].section != manageRoomsSectionCreate {
+	switch manageRoomsItems[m.selectedIndex].section {
+	case manageRoomsSectionCreate:
+		m.mode = manageRoomsModeCreate
+	case manageRoomsSectionJoin:
+		m.mode = manageRoomsModeJoin
+	default:
 		return nil
 	}
-	m.mode = manageRoomsModeCreate
 	m.errorMessage = ""
+	m.input.Reset()
+	m.syncInputPlaceholder()
 	return m.input.Focus()
 }
 
@@ -176,11 +195,20 @@ func (m *manageRoomsModel) resize(width, height int) {
 }
 
 func (m *manageRoomsModel) focusInputIfNeeded() tea.Cmd {
-	if m.mode != manageRoomsModeCreate {
+	if m.mode != manageRoomsModeCreate && m.mode != manageRoomsModeJoin {
 		m.input.Blur()
 		return nil
 	}
+	m.syncInputPlaceholder()
 	return m.input.Focus()
+}
+
+func (m *manageRoomsModel) syncInputPlaceholder() {
+	if m.mode == manageRoomsModeJoin {
+		m.input.Placeholder = "XXXX-XXXX"
+		return
+	}
+	m.input.Placeholder = "room name"
 }
 
 func (m manageRoomsModel) render() string {
@@ -197,12 +225,16 @@ func (m manageRoomsModel) renderBox(layout manageRoomsLayout) string {
 		m.styles.heading.Render(wrapCenter(manageRoomsHeadingLine, layout.content.width)),
 		"",
 	}
-	if m.mode == manageRoomsModeCreate {
-		sections = append(sections, m.renderCreateForm(layout.content.width))
+	if m.mode == manageRoomsModeCreate || m.mode == manageRoomsModeJoin {
+		sections = append(sections, m.renderInputForm(layout.content.width))
 		if m.errorMessage != "" {
 			sections = append(sections, "", m.styles.error.Render(wrapCenter(m.errorMessage, layout.content.width)))
 		}
-		sections = append(sections, "", m.styles.hint.Render(wrapCenter(manageRoomsCreateHintLine, layout.content.width)))
+		hint := manageRoomsCreateHintLine
+		if m.mode == manageRoomsModeJoin {
+			hint = manageRoomsJoinHintLine
+		}
+		sections = append(sections, "", m.styles.hint.Render(wrapCenter(hint, layout.content.width)))
 	} else {
 		sections = append(sections,
 			m.renderButtonRow(layout.content.width),
@@ -237,12 +269,13 @@ func (m manageRoomsModel) renderButtonRow(width int) string {
 	return lipgloss.NewStyle().Width(width).Align(lipgloss.Center).Render(row)
 }
 
-func (m manageRoomsModel) renderCreateForm(width int) string {
-	labelWidth := lipgloss.Width(manageRoomsRoomTitleLabel)
+func (m manageRoomsModel) renderInputForm(width int) string {
+	labelText := m.inputLabel()
+	labelWidth := lipgloss.Width(labelText)
 	label := m.styles.activeLabel.
 		Width(labelWidth).
 		Align(lipgloss.Right).
-		Render(ansi.Truncate(manageRoomsRoomTitleLabel, labelWidth, ""))
+		Render(ansi.Truncate(labelText, labelWidth, ""))
 	input := m.styles.inputLine.
 		Width(m.fieldInputWidth(width) + m.styles.inputLine.GetHorizontalFrameSize()).
 		Render(m.input.View())
@@ -250,8 +283,15 @@ func (m manageRoomsModel) renderCreateForm(width int) string {
 }
 
 func (m manageRoomsModel) fieldInputWidth(width int) int {
-	labelWidth := lipgloss.Width(manageRoomsRoomTitleLabel)
+	labelWidth := lipgloss.Width(m.inputLabel())
 	return max(1, width-labelWidth-1-m.styles.inputLine.GetHorizontalFrameSize())
+}
+
+func (m manageRoomsModel) inputLabel() string {
+	if m.mode == manageRoomsModeJoin {
+		return manageRoomsJoinCodeLabel
+	}
+	return manageRoomsRoomTitleLabel
 }
 
 var manageRoomsItems = []manageRoomsItem{
