@@ -151,6 +151,44 @@ func TestUserStoreFindMissingSSHKey(t *testing.T) {
 	}
 }
 
+func TestUserStoreDeleteAccountDeletesOwnedRoomsAndAnonymizesRemainingMessages(t *testing.T) {
+	store, closeDB := newTestUserStore(t)
+	defer closeDB()
+	ctx := context.Background()
+	createTestUser(t, store, auth.StoredUser{User: auth.User{ID: "user_1", Username: "alice"}, PasswordHash: "hash"})
+	createTestUser(t, store, auth.StoredUser{User: auth.User{ID: "user_2", Username: "bob"}, PasswordHash: "hash"})
+	if err := store.LinkSSHKey(ctx, auth.SSHKey{ID: "key_1", UserID: "user_1", PublicKey: "ssh-ed25519 AAAA", Fingerprint: "SHA256:abc"}); err != nil {
+		t.Fatalf("LinkSSHKey returned error: %v", err)
+	}
+	mustExec(t, store, `INSERT INTO rooms (id, title, join_code, created_by, created_at) VALUES ('owned', 'Owned', 'OWNED123', 'user_1', '2026-01-01T00:00:00Z')`)
+	mustExec(t, store, `INSERT INTO rooms (id, title, join_code, created_by, created_at) VALUES ('other', 'Other', 'OTHER123', 'user_2', '2026-01-01T00:00:00Z')`)
+	mustExec(t, store, `INSERT INTO room_memberships (room_id, user_id, role, joined_at) VALUES ('owned', 'user_1', 'owner', '2026-01-01T00:00:00Z')`)
+	mustExec(t, store, `INSERT INTO room_memberships (room_id, user_id, role, joined_at) VALUES ('other', 'user_2', 'owner', '2026-01-01T00:00:00Z')`)
+	mustExec(t, store, `INSERT INTO room_memberships (room_id, user_id, role, joined_at) VALUES ('other', 'user_1', 'member', '2026-01-01T00:00:00Z')`)
+	mustExec(t, store, `INSERT INTO messages (room_id, author_user_id, author_name, body, created_at) VALUES ('owned', 'user_1', 'alice', 'owned room message', '2026-01-01T00:00:00Z')`)
+	mustExec(t, store, `INSERT INTO messages (room_id, author_user_id, author_name, body, created_at) VALUES ('other', 'user_1', 'alice', 'other room message', '2026-01-01T00:00:00Z')`)
+
+	if err := store.DeleteAccount(ctx, "user_1"); err != nil {
+		t.Fatalf("DeleteAccount returned error: %v", err)
+	}
+	assertCount(t, store, `SELECT COUNT(*) FROM users WHERE id = 'user_1'`, 0)
+	assertCount(t, store, `SELECT COUNT(*) FROM ssh_keys WHERE user_id = 'user_1'`, 0)
+	assertCount(t, store, `SELECT COUNT(*) FROM rooms WHERE id = 'owned'`, 0)
+	assertCount(t, store, `SELECT COUNT(*) FROM messages WHERE body = 'owned room message'`, 0)
+	assertCount(t, store, `SELECT COUNT(*) FROM room_memberships WHERE user_id = 'user_1'`, 0)
+	assertCount(t, store, `SELECT COUNT(*) FROM rooms WHERE id = 'other'`, 1)
+
+	var authorID *string
+	var authorName string
+	row := store.db.QueryRowContext(ctx, `SELECT author_user_id, author_name FROM messages WHERE body = 'other room message'`)
+	if err := row.Scan(&authorID, &authorName); err != nil {
+		t.Fatalf("query anonymized message returned error: %v", err)
+	}
+	if authorID != nil || authorName != "deleted user" {
+		t.Fatalf("anonymized author id/name = %v/%q, want nil/deleted user", authorID, authorName)
+	}
+}
+
 func newTestUserStore(t *testing.T) (*UserStore, func()) {
 	t.Helper()
 	db, err := Open(context.Background(), ":memory:")
@@ -164,5 +202,23 @@ func createTestUser(t *testing.T, store *UserStore, user auth.StoredUser) {
 	t.Helper()
 	if _, err := store.CreateUser(context.Background(), user); err != nil {
 		t.Fatalf("CreateUser returned error: %v", err)
+	}
+}
+
+func mustExec(t *testing.T, store *UserStore, statement string) {
+	t.Helper()
+	if _, err := store.db.ExecContext(context.Background(), statement); err != nil {
+		t.Fatalf("exec %q returned error: %v", statement, err)
+	}
+}
+
+func assertCount(t *testing.T, store *UserStore, query string, want int) {
+	t.Helper()
+	var got int
+	if err := store.db.QueryRowContext(context.Background(), query).Scan(&got); err != nil {
+		t.Fatalf("count query %q returned error: %v", query, err)
+	}
+	if got != want {
+		t.Fatalf("count query %q = %d, want %d", query, got, want)
 	}
 }

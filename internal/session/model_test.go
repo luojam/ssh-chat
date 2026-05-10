@@ -637,6 +637,37 @@ func TestBackFromSettingsReturnsToMainMenu(t *testing.T) {
 	}
 }
 
+func TestDeleteAccountFromSettingsDeletesAuthenticatedUserAndQuits(t *testing.T) {
+	authService := &deleteRecordingAuthService{}
+	m := newModel(t, Config{
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		AuthService: authService,
+		Member:      chat.Member{ID: "user-1", Name: "alice"},
+	})
+	m = enterMainMenu(t, m)
+	next, _ := m.Update(tui.MainMenuSelectionRequested{Action: tui.MainMenuActionSettings})
+	m = assertModel(t, next)
+
+	next, cmd := m.Update(tui.DeleteAccountRequested{})
+	if cmd == nil {
+		t.Fatal("DeleteAccountRequested should return a quit command")
+	}
+	if msg := cmd(); msg == nil {
+		t.Fatal("quit command returned nil")
+	} else if _, ok := msg.(tea.QuitMsg); !ok {
+		t.Fatalf("quit command returned %T, want tea.QuitMsg", msg)
+	}
+	m = assertModel(t, next)
+	if !authService.deleted || authService.deletedUser.Username != "alice" {
+		t.Fatalf("deleted user = %+v called %v, want alice", authService.deletedUser, authService.deleted)
+	}
+	if !m.closed || m.authenticatedUser != nil {
+		t.Fatalf("after delete closed=%v authenticatedUser=%+v, want closed and nil user", m.closed, m.authenticatedUser)
+	}
+}
+
 func TestBackFromMyChatsReturnsToMainMenu(t *testing.T) {
 	m := newModel(t, Config{
 		Width:       40,
@@ -1178,6 +1209,18 @@ func enterMainMenu(t *testing.T, m model) model {
 	return m
 }
 
+type deleteRecordingAuthService struct {
+	successfulAuthService
+	deleted     bool
+	deletedUser auth.User
+}
+
+func (s *deleteRecordingAuthService) DeleteAccount(_ context.Context, user auth.User) error {
+	s.deleted = true
+	s.deletedUser = user
+	return nil
+}
+
 type successfulAuthService struct{}
 
 func (successfulAuthService) Signup(_ context.Context, username, _, _ string) (auth.User, error) {
@@ -1193,6 +1236,10 @@ func (successfulAuthService) FindUserBySSHKeyFingerprint(context.Context, string
 }
 
 func (successfulAuthService) LinkSSHKey(context.Context, auth.User, string, string) error {
+	return nil
+}
+
+func (successfulAuthService) DeleteAccount(context.Context, auth.User) error {
 	return nil
 }
 
@@ -1216,6 +1263,10 @@ func (s failingAuthService) LinkSSHKey(context.Context, auth.User, string, strin
 	return s.err
 }
 
+func (s failingAuthService) DeleteAccount(context.Context, auth.User) error {
+	return s.err
+}
+
 type recordingAuthService struct {
 	signupCalled    bool
 	confirmPassword string
@@ -1236,6 +1287,10 @@ func (s *recordingAuthService) FindUserBySSHKeyFingerprint(context.Context, stri
 }
 
 func (s *recordingAuthService) LinkSSHKey(context.Context, auth.User, string, string) error {
+	return nil
+}
+
+func (s *recordingAuthService) DeleteAccount(context.Context, auth.User) error {
 	return nil
 }
 
@@ -1273,4 +1328,13 @@ func (s *keyAuthService) LinkSSHKey(_ context.Context, user auth.User, _, finger
 		return nil
 	}
 	return auth.ErrSSHKeyAlreadyLinked
+}
+
+func (s *keyAuthService) DeleteAccount(_ context.Context, user auth.User) error {
+	for fingerprint, linked := range s.linked {
+		if linked.ID == user.ID {
+			delete(s.linked, fingerprint)
+		}
+	}
+	return nil
 }

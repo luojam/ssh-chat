@@ -87,6 +87,48 @@ func (s *UserStore) LinkSSHKey(ctx context.Context, key auth.SSHKey) error {
 	return auth.ErrSSHKeyAlreadyLinked
 }
 
+func (s *UserStore) DeleteAccount(ctx context.Context, userID string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Delete owned rooms explicitly instead of relying only on foreign-key
+	// cascades; SQLite enforces cascades per connection, and this keeps the
+	// account-deletion invariant local to this transaction.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM messages WHERE room_id IN (SELECT id FROM rooms WHERE created_by = ?)`, userID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM room_memberships WHERE room_id IN (SELECT id FROM rooms WHERE created_by = ?)`, userID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM rooms WHERE created_by = ?`, userID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE messages SET author_user_id = NULL, author_name = 'deleted user' WHERE author_user_id = ?`, userID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM room_memberships WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM ssh_keys WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, userID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return auth.ErrUserNotFound
+	}
+	return tx.Commit()
+}
+
 func isUniqueConstraint(err error) bool {
 	return err != nil && strings.Contains(strings.ToLower(err.Error()), "unique")
 }

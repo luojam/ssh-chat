@@ -239,8 +239,12 @@ func (s *ChatStore) RecentMessages(ctx context.Context, roomID chat.RoomID, limi
 	for rows.Next() {
 		var msg chat.Message
 		var createdAt string
-		if err := rows.Scan(&msg.ID, &msg.RoomID, &msg.Author.ID, &msg.Author.Name, &msg.Body, &createdAt); err != nil {
+		var authorID sql.NullString
+		if err := rows.Scan(&msg.ID, &msg.RoomID, &authorID, &msg.Author.Name, &msg.Body, &createdAt); err != nil {
 			return nil, err
+		}
+		if authorID.Valid {
+			msg.Author.ID = chat.UserID(authorID.String)
 		}
 		parsed, err := parseTime(createdAt)
 		if err != nil {

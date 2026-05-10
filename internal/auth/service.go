@@ -17,6 +17,7 @@ type Store interface {
 	FindByUsername(ctx context.Context, username string) (StoredUser, error)
 	FindUserBySSHKeyFingerprint(ctx context.Context, fingerprint string) (User, error)
 	LinkSSHKey(ctx context.Context, key SSHKey) error
+	DeleteAccount(ctx context.Context, userID string) error
 }
 
 type Service interface {
@@ -24,6 +25,7 @@ type Service interface {
 	Login(ctx context.Context, username, password string) (User, error)
 	FindUserBySSHKeyFingerprint(ctx context.Context, fingerprint string) (User, error)
 	LinkSSHKey(ctx context.Context, user User, publicKey, fingerprint string) error
+	DeleteAccount(ctx context.Context, user User) error
 }
 
 type PasswordService struct {
@@ -114,6 +116,13 @@ func (s *PasswordService) LinkSSHKey(ctx context.Context, user User, publicKey, 
 		PublicKey:   publicKey,
 		Fingerprint: fingerprint,
 	})
+}
+
+func (s *PasswordService) DeleteAccount(ctx context.Context, user User) error {
+	if strings.TrimSpace(user.ID) == "" {
+		return ErrInvalidInput
+	}
+	return s.store.DeleteAccount(ctx, user.ID)
 }
 
 func normalizeUsername(username string) string {

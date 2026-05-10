@@ -345,9 +345,18 @@ func deleteRoomErrorMessage(err error) string {
 }
 
 func (m *model) deleteAccount() tea.Cmd {
-	// Account deletion needs storage-level ownership semantics (owned rooms,
-	// authored messages, SSH keys) before Session can safely make this destructive.
-	return nil
+	if m.view != viewSettings || m.authService == nil || m.authenticatedUser == nil {
+		return nil
+	}
+	if err := m.authService.DeleteAccount(m.ctx, *m.authenticatedUser); err != nil {
+		return nil
+	}
+	m.authenticatedUser = nil
+	m.member.ID = ""
+	m.member.Name = ""
+	m.roomList = nil
+	m.close()
+	return tea.Quit
 }
 
 func (m *model) upsertRoomSummary(summary chat.RoomSummary) {

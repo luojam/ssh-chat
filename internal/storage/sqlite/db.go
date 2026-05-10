@@ -61,15 +61,16 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		`CREATE TABLE IF NOT EXISTS messages (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			room_id TEXT NOT NULL,
-			author_user_id TEXT NOT NULL,
+			author_user_id TEXT,
 			author_name TEXT NOT NULL,
 			body TEXT NOT NULL,
 			created_at TEXT NOT NULL,
 			FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
-			FOREIGN KEY (author_user_id) REFERENCES users(id) ON DELETE RESTRICT
+			FOREIGN KEY (author_user_id) REFERENCES users(id) ON DELETE SET NULL
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_room_memberships_user_id ON room_memberships(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_messages_room_id_id ON messages(room_id, id)`,
+		`CREATE INDEX IF NOT EXISTS idx_messages_author_user_id ON messages(author_user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_rooms_created_at ON rooms(created_at)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_rooms_join_code ON rooms(join_code)`,
 	}

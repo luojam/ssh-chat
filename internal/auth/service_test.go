@@ -165,6 +165,28 @@ func TestPasswordServiceRejectsSSHKeyLinkedToAnotherUser(t *testing.T) {
 	}
 }
 
+func TestPasswordServiceDeleteAccountRemovesUserAndSSHKeys(t *testing.T) {
+	store := newMemoryStore()
+	service := NewPasswordService(store)
+	user, err := store.CreateUser(context.Background(), StoredUser{User: User{ID: "user_1", Username: "alice"}, PasswordHash: "hash"})
+	if err != nil {
+		t.Fatalf("CreateUser returned error: %v", err)
+	}
+	if err := service.LinkSSHKey(context.Background(), user, "ssh-ed25519 AAAA", "SHA256:abc"); err != nil {
+		t.Fatalf("LinkSSHKey returned error: %v", err)
+	}
+
+	if err := service.DeleteAccount(context.Background(), user); err != nil {
+		t.Fatalf("DeleteAccount returned error: %v", err)
+	}
+	if _, err := store.FindByUsername(context.Background(), "alice"); !errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("FindByUsername after delete error = %v, want %v", err, ErrUserNotFound)
+	}
+	if _, err := store.FindUserBySSHKeyFingerprint(context.Background(), "SHA256:abc"); !errors.Is(err, ErrSSHKeyNotFound) {
+		t.Fatalf("FindUserBySSHKeyFingerprint after delete error = %v, want %v", err, ErrSSHKeyNotFound)
+	}
+}
+
 type memoryStore struct {
 	usersByUsername map[string]StoredUser
 	usersByID       map[string]StoredUser
@@ -218,4 +240,19 @@ func (s *memoryStore) LinkSSHKey(_ context.Context, key SSHKey) error {
 		return nil
 	}
 	return ErrSSHKeyAlreadyLinked
+}
+
+func (s *memoryStore) DeleteAccount(_ context.Context, userID string) error {
+	user, ok := s.usersByID[userID]
+	if !ok {
+		return ErrUserNotFound
+	}
+	delete(s.usersByID, userID)
+	delete(s.usersByUsername, user.Username)
+	for fingerprint, key := range s.keys {
+		if key.UserID == userID {
+			delete(s.keys, fingerprint)
+		}
+	}
+	return nil
 }
