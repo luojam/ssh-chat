@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	manageRoomsHeadingLine           = "MANAGE ROOMS"
+	manageRoomsHeadingLine           = "Manage Rooms"
 	manageRoomsCreateTitle           = "Create Room"
 	manageRoomsJoinTitle             = "Join Room"
 	manageRoomsDeleteTitle           = "Delete Room"
@@ -33,6 +33,8 @@ const (
 	manageRoomsFramePaddingX         = 2
 	manageRoomsFramePaddingY         = 1
 	manageRoomsButtonGap             = 3
+	manageRoomsCreateInputWidth      = 24
+	manageRoomsJoinInputWidth        = 9
 )
 
 type manageRoomsMode int
@@ -123,11 +125,13 @@ func (m manageRoomsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode = manageRoomsModeCreate
 		m.errorMessage = msg.Message
 		m.syncInputPlaceholder()
+		m.syncInputWidth()
 		return m, m.input.Focus()
 	case JoinRoomFailed:
 		m.mode = manageRoomsModeJoin
 		m.errorMessage = msg.Message
 		m.syncInputPlaceholder()
+		m.syncInputWidth()
 		return m, m.input.Focus()
 	case DeleteRoomFailed:
 		m.mode = manageRoomsModeDeleteConfirm
@@ -277,6 +281,7 @@ func (m *manageRoomsModel) selectCurrent() tea.Cmd {
 	m.errorMessage = ""
 	m.input.Reset()
 	m.syncInputPlaceholder()
+	m.syncInputWidth()
 	return m.focusInputIfNeeded()
 }
 
@@ -307,6 +312,7 @@ func (m *manageRoomsModel) focusInputIfNeeded() tea.Cmd {
 		return nil
 	}
 	m.syncInputPlaceholder()
+	m.syncInputWidth()
 	return m.input.Focus()
 }
 
@@ -316,6 +322,11 @@ func (m *manageRoomsModel) syncInputPlaceholder() {
 		return
 	}
 	m.input.Placeholder = "room name"
+}
+
+func (m *manageRoomsModel) syncInputWidth() {
+	layout := manageRoomsLayoutFor(m.screen.width, m.screen.height, m.styles)
+	m.input.SetWidth(m.fieldInputWidth(layout.content.width))
 }
 
 func (m manageRoomsModel) render() string {
@@ -410,7 +421,8 @@ func (m manageRoomsModel) renderInputForm(width int) string {
 	input := m.styles.inputLine.
 		Width(m.fieldInputWidth(width) + m.styles.inputLine.GetHorizontalFrameSize()).
 		Render(m.input.View())
-	return lipgloss.JoinHorizontal(lipgloss.Top, label, " ", input)
+	field := lipgloss.JoinHorizontal(lipgloss.Top, label, " ", input)
+	return lipgloss.NewStyle().Width(width).Align(lipgloss.Center).Render(field)
 }
 
 func (m manageRoomsModel) renderDeleteListView() string {
@@ -461,7 +473,11 @@ func (m manageRoomsModel) renderDeleteConfirm(width int) string {
 
 func (m manageRoomsModel) fieldInputWidth(width int) int {
 	labelWidth := lipgloss.Width(m.inputLabel())
-	return max(1, width-labelWidth-1-m.styles.inputLine.GetHorizontalFrameSize())
+	maxWidth := max(1, width-labelWidth-1-m.styles.inputLine.GetHorizontalFrameSize())
+	if m.mode == manageRoomsModeJoin {
+		return min(manageRoomsJoinInputWidth, maxWidth)
+	}
+	return min(manageRoomsCreateInputWidth, maxWidth)
 }
 
 func (m manageRoomsModel) inputLabel() string {
