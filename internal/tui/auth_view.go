@@ -10,21 +10,20 @@ import (
 )
 
 const (
-	authTitleLine       = "SSH Chat"
-	authLoginTab        = "Log in"
-	authSignupTab       = "Sign up"
-	authUsernameLabel   = "Username"
-	authPasswordLabel   = "Password"
-	authConfirmLabel    = "Confirm password"
-	authLoginHint       = "↑/↓/←/→ switch • enter login • esc back"
-	authSignupHint      = "↑/↓/←/→ switch • enter create • esc back"
-	authTargetBoxWidth  = 58
-	authTargetBoxHeight = 18
-	authFramePaddingX   = 2
-	authFramePaddingY   = 1
-	authTopPaddingRows  = 3
-	authModeLogin       = AuthModeLogin
-	authModeSignup      = AuthModeSignup
+	authTitleLine           = "SSH Chat"
+	authLoginTab            = "Log in"
+	authSignupTab           = "Sign up"
+	authUsernameLabel       = "Username"
+	authPasswordLabel       = "Password"
+	authConfirmLabel        = "Confirm password"
+	authLoginHint           = "↑/↓/←/→ switch • enter login • esc back"
+	authSignupHint          = "↑/↓/←/→ switch • enter create • esc back"
+	authTargetBoxWidth      = 58
+	authFramePaddingX       = 2
+	authFramePaddingY       = 1
+	authVerticalPaddingRows = 3
+	authModeLogin           = AuthModeLogin
+	authModeSignup          = AuthModeSignup
 )
 
 type AuthMode int
@@ -120,7 +119,7 @@ func (m *authModel) setDark(isDark bool) {
 
 func (m *authModel) resize(width, height int) {
 	m.screen.resize(width, height)
-	layout := authLayoutFor(width, height, m.styles)
+	layout := authLayoutFor(width, height, m.styles, 1)
 	inputWidth := m.fieldInputWidth(layout.content.width)
 	for i := range m.inputs {
 		m.inputs[i].SetWidth(inputWidth)
@@ -178,27 +177,18 @@ func (m authModel) authSubmission() AuthSubmissionRequested {
 }
 
 func (m authModel) render() string {
-	layout := authLayoutFor(m.screen.width, m.screen.height, m.styles)
+	layout := authLayoutFor(m.screen.width, m.screen.height, m.styles, 1)
+	body := m.renderAuthBody(layout.content.width)
+	layout = authLayoutFor(m.screen.width, m.screen.height, m.styles, m.desiredContentHeight(layout.content.width))
+
 	return lipgloss.NewStyle().
 		Width(layout.frame.width).
 		Height(layout.frame.height).
 		Align(lipgloss.Center, lipgloss.Center).
-		Render(m.renderAuthBox(layout))
+		Render(m.renderAuthBox(layout, body))
 }
 
-func (m authModel) renderAuthBox(layout authLayout) string {
-	sections := []string{
-		m.renderTabs(layout.content.width),
-		"",
-		m.renderFields(layout.content.width),
-	}
-	if m.errorMessage != "" {
-		sections = append(sections, "", m.renderError(layout.content.width))
-	}
-	sections = append(sections, "", m.renderHint(layout.content.width))
-
-	body := lipgloss.JoinVertical(lipgloss.Center, sections...)
-
+func (m authModel) renderAuthBox(layout authLayout, body string) string {
 	content := body
 	if rows := m.topPaddingRows(layout.content.height, body); rows > 0 {
 		content = strings.Repeat("\n", rows) + body
@@ -215,8 +205,32 @@ func (m authModel) renderAuthBox(layout authLayout) string {
 		Render(content)
 }
 
+func (m authModel) renderAuthBody(width int) string {
+	sections := []string{
+		m.renderTabs(width),
+		"",
+		m.renderFields(width),
+	}
+	if m.errorMessage != "" {
+		sections = append(sections, "", m.renderError(width))
+	}
+	sections = append(sections, "", m.renderHint(width))
+	return lipgloss.JoinVertical(lipgloss.Center, sections...)
+}
+
+func (m authModel) desiredContentHeight(width int) int {
+	loginBodyHeight := m.authBodyHeightForMode(width, AuthModeLogin)
+	signupBodyHeight := m.authBodyHeightForMode(width, AuthModeSignup)
+	return max(loginBodyHeight, signupBodyHeight) + authVerticalPaddingRows*2
+}
+
+func (m authModel) authBodyHeightForMode(width int, mode AuthMode) int {
+	m.mode = mode
+	return lipgloss.Height(m.renderAuthBody(width))
+}
+
 func (m authModel) topPaddingRows(contentHeight int, body string) int {
-	return max(0, min(authTopPaddingRows, contentHeight-lipgloss.Height(body)))
+	return max(0, min(authVerticalPaddingRows, contentHeight-lipgloss.Height(body)))
 }
 
 func (m authModel) renderTitle(width int) string {
@@ -308,9 +322,9 @@ type authLayout struct {
 	content frameSize
 }
 
-func authLayoutFor(width, height int, styles authStyles) authLayout {
+func authLayoutFor(width, height int, styles authStyles, desiredContentHeight int) authLayout {
 	frame := safeFrameSize(width, height)
-	box := authBoxSize(frame, styles.box)
+	box := authBoxSize(frame, styles.box, desiredContentHeight)
 	content := frameSize{
 		width:  max(1, box.width-styles.box.GetHorizontalFrameSize()),
 		height: max(1, box.height-styles.box.GetVerticalFrameSize()),
@@ -318,7 +332,7 @@ func authLayoutFor(width, height int, styles authStyles) authLayout {
 	return authLayout{frame: frame, box: box, content: content}
 }
 
-func authBoxSize(frame frameSize, style lipgloss.Style) frameSize {
+func authBoxSize(frame frameSize, style lipgloss.Style, desiredContentHeight int) frameSize {
 	maxWidth := frame.width
 	if frame.width > authFramePaddingX*2+style.GetHorizontalFrameSize() {
 		maxWidth -= authFramePaddingX * 2
@@ -329,8 +343,9 @@ func authBoxSize(frame frameSize, style lipgloss.Style) frameSize {
 		maxHeight -= authFramePaddingY * 2
 	}
 
+	desiredBoxHeight := safeDimension(desiredContentHeight) + style.GetVerticalFrameSize()
 	return frameSize{
 		width:  max(1, min(authTargetBoxWidth, maxWidth)),
-		height: max(1, min(authTargetBoxHeight, maxHeight)),
+		height: max(1, min(desiredBoxHeight, maxHeight)),
 	}
 }
