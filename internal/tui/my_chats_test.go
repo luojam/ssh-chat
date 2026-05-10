@@ -48,6 +48,18 @@ func TestMyChatsContainerIsCenteredAndConstrained(t *testing.T) {
 	}
 }
 
+func TestMyChatsViewShowsPaginationIndicator(t *testing.T) {
+	rooms := make([]RoomListItem, 0, 10)
+	for i := range 10 {
+		rooms = append(rooms, RoomListItem{ID: string(rune('a' + i)), Title: "Room"})
+	}
+	m := newMyChatsModel(t, Config{Width: 50, Height: 12, Rooms: rooms})
+
+	if !strings.Contains(m.View().Content, "Page 1/") {
+		t.Fatalf("my chats view should include pagination indicator, got %q", m.View().Content)
+	}
+}
+
 func TestMyChatsEnterRequestsSelectedRoom(t *testing.T) {
 	m := newMyChatsModel(t, Config{Width: 50, Height: 12})
 

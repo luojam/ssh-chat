@@ -144,6 +144,21 @@ func TestManageRoomsDeleteRoomListShowsMultipleRooms(t *testing.T) {
 	}
 }
 
+func TestManageRoomsDeleteRoomListShowsPaginationIndicator(t *testing.T) {
+	rooms := make([]RoomListItem, 0, 12)
+	for i := range 12 {
+		rooms = append(rooms, RoomListItem{ID: string(rune('a' + i)), Title: "Room"})
+	}
+	m := newManageRoomsModel(t, Config{Width: 70, Height: 20, OwnedRooms: rooms})
+	m = updateManageRoomsModel(t, m, keySpecial(tea.KeyRight))
+	m = updateManageRoomsModel(t, m, keySpecial(tea.KeyRight))
+	m = updateManageRoomsModel(t, m, keySpecial(tea.KeyEnter))
+
+	if !strings.Contains(m.View().Content, "Page 1/") {
+		t.Fatalf("delete room list should include pagination indicator, got %q", m.View().Content)
+	}
+}
+
 func TestManageRoomsDeleteRoomEmptyState(t *testing.T) {
 	m := newManageRoomsModel(t, Config{Width: 70, Height: 20})
 	m = updateManageRoomsModel(t, m, keySpecial(tea.KeyRight))

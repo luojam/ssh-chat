@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/list"
@@ -423,10 +424,13 @@ func (m manageRoomsModel) renderDeleteListView() string {
 	}
 
 	sections := []string{listContent}
+	if indicator := listPaginationIndicator(m.deleteList); indicator != "" {
+		sections = append(sections, m.styles.hint.Width(layout.content.width).Align(lipgloss.Center).Render(indicator))
+	}
 	if m.errorMessage != "" {
 		sections = append(sections, m.styles.error.Render(wrapCenter(m.errorMessage, layout.content.width)))
 	}
-	sections = append(sections, "", m.styles.hint.Width(layout.content.width).Align(lipgloss.Center).Render(manageRoomsDeleteHintLine))
+	sections = append(sections, m.styles.hint.Width(layout.content.width).Align(lipgloss.Center).Render(manageRoomsDeleteHintLine))
 	content := lipgloss.JoinVertical(lipgloss.Left, sections...)
 	content = lipgloss.NewStyle().
 		Width(layout.content.width).
@@ -464,6 +468,13 @@ func (m manageRoomsModel) inputLabel() string {
 		return manageRoomsJoinCodeLabel
 	}
 	return manageRoomsRoomTitleLabel
+}
+
+func listPaginationIndicator(l list.Model) string {
+	if l.Paginator.TotalPages <= 1 {
+		return ""
+	}
+	return fmt.Sprintf("Page %d/%d", l.Paginator.Page+1, l.Paginator.TotalPages)
 }
 
 func newManageRoomsDeleteList(styles myChatsStyles, rooms []RoomListItem) list.Model {

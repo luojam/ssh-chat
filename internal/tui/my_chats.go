@@ -116,15 +116,17 @@ func (m myChatsModel) render() string {
 		Align(lipgloss.Center).
 		Render(listBox)
 
-	content := lipgloss.JoinVertical(
-		lipgloss.Left,
-		centeredListBox,
-		"",
+	sections := []string{centeredListBox}
+	if indicator := listPaginationIndicator(m.list); indicator != "" {
+		sections = append(sections, m.styles.hint.Width(layout.content.width).Align(lipgloss.Center).Render(indicator))
+	}
+	sections = append(sections,
 		m.styles.hint.
 			Width(layout.content.width).
 			Align(lipgloss.Center).
 			Render(myChatsHintLine),
 	)
+	content := lipgloss.JoinVertical(lipgloss.Left, sections...)
 
 	container := lipgloss.NewStyle().
 		Width(layout.container.width).
@@ -185,7 +187,7 @@ func myChatsLayoutFor(width, height int, styles myChatsStyles) myChatsLayout {
 	}
 	listBox := frameSize{
 		width:  max(1, min(myChatsListTargetWidth, content.width)),
-		height: max(1, content.height-2), // spacer plus hint line below the list.
+		height: max(1, content.height-2), // pagination indicator plus hint line below the list.
 	}
 	listContent := frameSize{
 		width:  max(1, listBox.width-styles.listBorder.GetHorizontalFrameSize()),
