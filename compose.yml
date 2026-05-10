@@ -1,0 +1,15 @@
+services:
+  ssh-chat:
+    build: .
+    image: ssh-chat:latest
+    container_name: ssh-chat
+    restart: unless-stopped
+    ports:
+      - "2222:2222"
+    environment:
+      SSH_CHAT_HOST: 0.0.0.0
+      SSH_CHAT_PORT: 2222
+      SSH_CHAT_HOST_KEY_PATH: /var/lib/ssh-chat/ssh_host_ed25519
+      SSH_CHAT_SQLITE_PATH: /var/lib/ssh-chat/ssh-chat.sqlite
+    volumes:
+      - ${SSH_CHAT_DATA_DIR:-/var/lib/ssh-chat}:/var/lib/ssh-chat

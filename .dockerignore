@@ -1,0 +1,31 @@
+.git
+.gitignore
+AGENTS.md
+CONTEXT.md
+docs
+README.md
+
+# Local runtime state/secrets; must come from runtime volume, not image.
+.ssh
+data
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Build/test outputs.
+bin
+dist
+ssh-chat
+*.exe
+*.test
+*.out
+coverage.*
+*.prof
+
+# Local editor/agent files.
+.DS_Store
+.idea
+.vscode
+*.swp
+.codex
+.cursor
