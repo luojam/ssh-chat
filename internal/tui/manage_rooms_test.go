@@ -107,6 +107,9 @@ func TestManageRoomsDeleteRoomSelectionAndConfirmation(t *testing.T) {
 	if m.mode != manageRoomsModeDeleteConfirm || !strings.Contains(m.View().Content, "Delete") || !strings.Contains(m.View().Content, "Project Room") {
 		t.Fatalf("confirmation should render room name, mode %d view %q", m.mode, m.View().Content)
 	}
+	if strings.Contains(m.View().Content, manageRoomsDeleteTitle) {
+		t.Fatalf("confirmation should not render extra delete room title, got %q", m.View().Content)
+	}
 
 	m = updateManageRoomsModel(t, m, keySpecial(tea.KeyLeft))
 	_, cmd = m.Update(keySpecial(tea.KeyEnter))

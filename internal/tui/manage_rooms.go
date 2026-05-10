@@ -331,9 +331,12 @@ func (m manageRoomsModel) render() string {
 }
 
 func (m manageRoomsModel) renderBox(layout manageRoomsLayout) string {
-	sections := []string{
-		m.styles.heading.Render(wrapCenter(m.headingLine(), layout.content.width)),
-		"",
+	sections := make([]string, 0, 6)
+	if m.mode != manageRoomsModeDeleteConfirm {
+		sections = append(sections,
+			m.styles.heading.Render(wrapCenter(m.headingLine(), layout.content.width)),
+			"",
+		)
 	}
 	switch m.mode {
 	case manageRoomsModeCreate, manageRoomsModeJoin:
@@ -379,8 +382,6 @@ func (m manageRoomsModel) headingLine() string {
 		return manageRoomsCreateTitle
 	case manageRoomsModeJoin:
 		return manageRoomsJoinTitle
-	case manageRoomsModeDeleteConfirm:
-		return manageRoomsDeleteTitle
 	default:
 		return manageRoomsHeadingLine
 	}
