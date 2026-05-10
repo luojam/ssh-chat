@@ -18,6 +18,7 @@ const (
 	viewMainMenu
 	viewMyChats
 	viewManageRooms
+	viewSettings
 	viewChat
 )
 

@@ -594,6 +594,49 @@ func TestMainMenuMyChatsSelectionShowsMyChats(t *testing.T) {
 	}
 }
 
+func TestMainMenuSettingsSelectionShowsSettingsWithUsername(t *testing.T) {
+	m := newModel(t, Config{
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterMainMenu(t, m)
+
+	next, cmd := m.Update(tui.MainMenuSelectionRequested{Action: tui.MainMenuActionSettings})
+	if cmd == nil {
+		t.Fatal("Settings selection should initialize Settings view")
+	}
+	m = assertModel(t, next)
+	if m.view != viewSettings {
+		t.Fatalf("view = %d, want viewSettings", m.view)
+	}
+	if !strings.Contains(m.View().Content, "user") {
+		t.Fatalf("settings view should include username, got %q", m.View().Content)
+	}
+}
+
+func TestBackFromSettingsReturnsToMainMenu(t *testing.T) {
+	m := newModel(t, Config{
+		Width:       40,
+		Height:      12,
+		ChatService: newTestChatService(),
+		Member:      chat.Member{ID: "user-1", Name: "user"},
+	})
+	m = enterMainMenu(t, m)
+	next, _ := m.Update(tui.MainMenuSelectionRequested{Action: tui.MainMenuActionSettings})
+	m = assertModel(t, next)
+
+	next, cmd := m.Update(tui.BackRequested{})
+	if cmd == nil {
+		t.Fatal("BackRequested from Settings should initialize main menu")
+	}
+	m = assertModel(t, next)
+	if m.view != viewMainMenu {
+		t.Fatalf("view = %d, want viewMainMenu", m.view)
+	}
+}
+
 func TestBackFromMyChatsReturnsToMainMenu(t *testing.T) {
 	m := newModel(t, Config{
 		Width:       40,

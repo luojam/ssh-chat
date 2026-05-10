@@ -65,6 +65,8 @@ func (m *model) backFromCurrentView() tea.Cmd {
 		return m.showStandaloneView(viewMainMenu)
 	case viewManageRooms:
 		return m.showStandaloneView(viewMainMenu)
+	case viewSettings:
+		return m.showStandaloneView(viewMainMenu)
 	default:
 		return nil
 	}
@@ -164,6 +166,8 @@ func (m *model) openMainMenuSelection(action tui.MainMenuAction) tea.Cmd {
 		return m.showMyChats()
 	case tui.MainMenuActionManageRooms:
 		return m.showManageRooms()
+	case tui.MainMenuActionSettings:
+		return m.showStandaloneView(viewSettings)
 	default:
 		return nil
 	}
@@ -406,6 +410,9 @@ func (m model) inRoomView() bool {
 
 func (m model) newUI(view viewState) tea.Model {
 	config := tui.Config{Width: m.width, Height: m.height}
+	if m.authenticatedUser != nil {
+		config.Username = m.authenticatedUser.Username
+	}
 	switch view {
 	case viewWelcome:
 		return tui.NewWelcome(config)
@@ -422,6 +429,8 @@ func (m model) newUI(view viewState) tea.Model {
 	case viewManageRooms:
 		config.OwnedRooms = ownedRoomListItems(m.roomList)
 		return tui.NewManageRooms(config)
+	case viewSettings:
+		return tui.NewSettings(config)
 	case viewChat:
 		config.RoomTitle = m.activeRoomTitle
 		config.RoomJoinCode = chat.FormatJoinCode(m.activeRoomJoinCode)

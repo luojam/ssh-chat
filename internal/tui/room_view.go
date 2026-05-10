@@ -23,6 +23,7 @@ type Config struct {
 	RoomTitle         string
 	RoomJoinCode      string
 	SSHKeyFingerprint string
+	Username          string
 }
 
 type RoomListItem struct {
