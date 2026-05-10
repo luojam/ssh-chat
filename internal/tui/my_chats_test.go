@@ -37,12 +37,12 @@ func TestMyChatsViewShowsRoomList(t *testing.T) {
 
 func TestMyChatsContainerIsCenteredAndConstrained(t *testing.T) {
 	m := newMyChatsModel(t, Config{Width: 100, Height: 30})
-	layout := myChatsLayoutFor(m.screen.width, m.screen.height, m.styles)
+	layout := myChatsLayoutFor(m.screen.width, m.screen.height, m.styles, len(m.list.Items()))
 
 	if got, want := layout.container.width, myChatsTargetWidth; got != want {
 		t.Fatalf("container width = %d, want %d", got, want)
 	}
-	wantHeight := min(myChatsTargetHeight, m.screen.height-myChatsFramePaddingY*2)
+	wantHeight := myChatsListTitleHeight + 1 + myChatsHintHeight + myChatsContainerPadY*2
 	if got := layout.container.height; got != wantHeight {
 		t.Fatalf("container height = %d, want %d", got, wantHeight)
 	}

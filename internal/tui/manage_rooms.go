@@ -493,7 +493,6 @@ func newManageRoomsDeleteList(styles myChatsStyles, rooms []RoomListItem) list.M
 
 func manageRoomsDeleteDelegate(styles myChatsStyles) list.DefaultDelegate {
 	delegate := styles.listDelegate()
-	delegate.SetSpacing(0)
 	delegate.ShowDescription = false
 	return delegate
 }

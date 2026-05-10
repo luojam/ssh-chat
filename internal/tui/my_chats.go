@@ -7,16 +7,19 @@ import (
 )
 
 const (
-	myChatsTitle           = "My Chats"
-	myChatsHintLine        = "↑/↓ move • enter • esc back • ctrl+c quit"
-	myChatsEmptyState      = "No rooms yet. Go to Manage Rooms to create one."
-	myChatsTargetWidth     = 56
-	myChatsTargetHeight    = 20
-	myChatsListTargetWidth = 32
-	myChatsFramePaddingX   = 2
-	myChatsFramePaddingY   = 1
-	myChatsContainerPadX   = 2
-	myChatsContainerPadY   = 1
+	myChatsTitle            = "My Chats"
+	myChatsHintLine         = "↑/↓ move • enter • esc back • ctrl+c quit"
+	myChatsEmptyState       = "No rooms yet. Go to Manage Rooms to create one."
+	myChatsTargetWidth      = 56
+	myChatsListTargetWidth  = 32
+	myChatsFramePaddingX    = 2
+	myChatsFramePaddingY    = 1
+	myChatsContainerPadX    = 2
+	myChatsContainerPadY    = 1
+	myChatsMaxVisibleRooms  = 8
+	myChatsListTitleHeight  = 2
+	myChatsPaginationHeight = 1
+	myChatsHintHeight       = 1
 )
 
 type myChatsRoomItem struct {
@@ -89,14 +92,14 @@ func (m *myChatsModel) setDark(isDark bool) {
 func (m *myChatsModel) resize(width, height int) {
 	m.screen.resize(width, height)
 
-	layout := myChatsLayoutFor(width, height, m.styles)
+	layout := myChatsLayoutFor(width, height, m.styles, len(m.list.Items()))
 	listHeight := max(1, layout.listContent.height)
 	m.list.Styles = m.styles.listStyles(layout.listContent.width)
 	m.list.SetSize(layout.listContent.width, listHeight)
 }
 
 func (m myChatsModel) render() string {
-	layout := myChatsLayoutFor(m.screen.width, m.screen.height, m.styles)
+	layout := myChatsLayoutFor(m.screen.width, m.screen.height, m.styles, len(m.list.Items()))
 	listHeight := max(1, layout.listContent.height)
 	listContent := fitBlockHeight(m.list.View(), listHeight)
 	if len(m.list.Items()) == 0 {
@@ -178,16 +181,17 @@ type myChatsLayout struct {
 	listContent frameSize
 }
 
-func myChatsLayoutFor(width, height int, styles myChatsStyles) myChatsLayout {
+func myChatsLayoutFor(width, height int, styles myChatsStyles, itemCount int) myChatsLayout {
 	frame := safeFrameSize(width, height)
-	container := myChatsContainerSize(frame)
+	container := myChatsContainerSize(frame, styles, itemCount)
 	content := frameSize{
 		width:  max(1, container.width-myChatsContainerPadX*2),
 		height: max(1, container.height-myChatsContainerPadY*2),
 	}
+	footerHeight := myChatsFooterHeight(itemCount)
 	listBox := frameSize{
 		width:  max(1, min(myChatsListTargetWidth, content.width)),
-		height: max(1, content.height-2), // pagination indicator plus hint line below the list.
+		height: max(1, content.height-footerHeight),
 	}
 	listContent := frameSize{
 		width:  max(1, listBox.width-styles.listBorder.GetHorizontalFrameSize()),
@@ -203,7 +207,7 @@ func myChatsLayoutFor(width, height int, styles myChatsStyles) myChatsLayout {
 	}
 }
 
-func myChatsContainerSize(frame frameSize) frameSize {
+func myChatsContainerSize(frame frameSize, styles myChatsStyles, itemCount int) frameSize {
 	maxWidth := frame.width
 	if frame.width > myChatsFramePaddingX*2 {
 		maxWidth -= myChatsFramePaddingX * 2
@@ -214,8 +218,24 @@ func myChatsContainerSize(frame frameSize) frameSize {
 		maxHeight -= myChatsFramePaddingY * 2
 	}
 
+	visibleItems := myChatsVisibleItems(itemCount)
+	listContentHeight := myChatsListTitleHeight + visibleItems
+	listBoxHeight := listContentHeight + styles.listBorder.GetVerticalFrameSize()
+	desiredHeight := listBoxHeight + myChatsFooterHeight(itemCount) + myChatsContainerPadY*2
+
 	return frameSize{
 		width:  max(1, min(myChatsTargetWidth, maxWidth)),
-		height: max(1, min(myChatsTargetHeight, maxHeight)),
+		height: max(1, min(desiredHeight, maxHeight)),
 	}
+}
+
+func myChatsFooterHeight(itemCount int) int {
+	if itemCount > myChatsVisibleItems(itemCount) {
+		return myChatsPaginationHeight + myChatsHintHeight
+	}
+	return myChatsHintHeight
+}
+
+func myChatsVisibleItems(itemCount int) int {
+	return min(max(1, itemCount), myChatsMaxVisibleRooms)
 }

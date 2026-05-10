@@ -223,6 +223,7 @@ func (s myChatsStyles) listStyles(width int) list.Styles {
 
 func (s myChatsStyles) listDelegate() list.DefaultDelegate {
 	delegate := list.NewDefaultDelegate()
+	delegate.SetSpacing(0)
 	delegate.Styles = list.NewDefaultItemStyles(s.isDark)
 	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.
 		BorderLeft(true).
