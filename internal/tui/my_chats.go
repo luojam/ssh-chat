@@ -19,7 +19,7 @@ const (
 	myChatsMaxVisibleRooms  = 8
 	myChatsListTitleHeight  = 2
 	myChatsPaginationHeight = 1
-	myChatsHintHeight       = 1
+	myChatsHintHeight       = 2
 )
 
 type myChatsRoomItem struct {
@@ -124,6 +124,7 @@ func (m myChatsModel) render() string {
 		sections = append(sections, m.styles.hint.Width(layout.content.width).Align(lipgloss.Center).Render(indicator))
 	}
 	sections = append(sections,
+		"",
 		m.styles.hint.
 			Width(layout.content.width).
 			Align(lipgloss.Center).

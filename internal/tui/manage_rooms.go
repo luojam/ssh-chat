@@ -29,7 +29,7 @@ const (
 	manageRoomsListTargetWidth       = 56
 	manageRoomsDeleteMaxVisibleRooms = 8
 	manageRoomsDeleteTitleHeight     = 2
-	manageRoomsDeleteFooterHeight    = 2
+	manageRoomsDeleteFooterHeight    = 3
 	manageRoomsFramePaddingX         = 2
 	manageRoomsFramePaddingY         = 1
 	manageRoomsButtonGap             = 3
@@ -443,7 +443,7 @@ func (m manageRoomsModel) renderDeleteListView() string {
 	if m.errorMessage != "" {
 		sections = append(sections, m.styles.error.Render(wrapCenter(m.errorMessage, layout.content.width)))
 	}
-	sections = append(sections, m.styles.hint.Width(layout.content.width).Align(lipgloss.Center).Render(manageRoomsDeleteHintLine))
+	sections = append(sections, "", m.styles.hint.Width(layout.content.width).Align(lipgloss.Center).Render(manageRoomsDeleteHintLine))
 	content := lipgloss.JoinVertical(lipgloss.Left, sections...)
 	content = lipgloss.NewStyle().
 		Width(layout.content.width).
