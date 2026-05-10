@@ -95,6 +95,9 @@ type DeleteRoomFailed struct {
 // DeleteRoomSucceeded asks the Manage Rooms view to return to its action menu after deletion.
 type DeleteRoomSucceeded struct{}
 
+// DeleteAccountRequested asks the session to permanently delete the authenticated account.
+type DeleteAccountRequested struct{}
+
 // LeaveRequested is emitted by the room view when the user chooses to leave the
 // room without quitting the SSH session.
 type LeaveRequested struct{}
@@ -145,6 +148,10 @@ func requestDeleteRoom(roomID string) tea.Cmd {
 	return func() tea.Msg {
 		return DeleteRoomRequested{RoomID: roomID}
 	}
+}
+
+func requestDeleteAccount() tea.Msg {
+	return DeleteAccountRequested{}
 }
 
 func requestSSHKeyLinkSelection(link bool) tea.Cmd {

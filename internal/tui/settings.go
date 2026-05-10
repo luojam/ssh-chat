@@ -7,22 +7,38 @@ import (
 )
 
 const (
-	settingsTitle          = "Settings"
-	settingsUsernameLabel  = "Signed in as"
-	settingsHintLine       = "↑/↓ move • enter select • esc back • ctrl+c quit"
-	settingsTargetWidth    = 56
-	settingsMaxVisibleRows = 4
-	settingsFramePaddingX  = 2
-	settingsFramePaddingY  = 1
-	settingsContainerPadX  = 2
-	settingsContainerPadY  = 1
-	settingsTitleHeight    = 2
-	settingsAccountHeight  = 1
-	settingsListTopPadding = 1
-	settingsHintHeight     = 1
+	settingsTitle           = "Settings"
+	settingsUsernameLabel   = "Signed in as"
+	settingsHintLine        = "↑/↓ move • enter select • esc back • ctrl+c quit"
+	settingsConfirmHintLine = "←/→ switch • enter choose • esc cancel • ctrl+c quit"
+	settingsTargetWidth     = 56
+	settingsMaxVisibleRows  = 4
+	settingsFramePaddingX   = 2
+	settingsFramePaddingY   = 1
+	settingsContainerPadX   = 2
+	settingsContainerPadY   = 1
+	settingsTitleHeight     = 2
+	settingsAccountHeight   = 1
+	settingsListTopPadding  = 1
+	settingsHintHeight      = 1
+)
+
+type settingsMode int
+
+const (
+	settingsModeMenu settingsMode = iota
+	settingsModeDeleteConfirm
+)
+
+type settingsOptionAction int
+
+const (
+	settingsOptionSSHKeys settingsOptionAction = iota
+	settingsOptionDeleteAccount
 )
 
 type settingsOptionItem struct {
+	action      settingsOptionAction
 	title       string
 	description string
 }
@@ -44,10 +60,12 @@ func NewSettings(config Config) tea.Model {
 }
 
 type settingsModel struct {
-	screen   screenState
-	styles   myChatsStyles
-	username string
-	list     list.Model
+	screen       screenState
+	styles       myChatsStyles
+	username     string
+	list         list.Model
+	mode         settingsMode
+	confirmIndex int
 }
 
 func (m settingsModel) Init() tea.Cmd {
@@ -65,19 +83,65 @@ func (m settingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.resize(msg.Width, msg.Height)
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case keyQuit:
-			return m, requestQuit
-		case keyBack:
-			return m, requestBack
-		case keySend:
-			return m, nil
+		if handled, cmd := m.handleKeyPress(msg); handled {
+			return m, cmd
 		}
 	}
 
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
 	return m, cmd
+}
+
+func (m *settingsModel) handleKeyPress(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	if m.mode == settingsModeDeleteConfirm {
+		return m.handleDeleteConfirmKey(msg)
+	}
+
+	switch msg.String() {
+	case keyQuit:
+		return true, requestQuit
+	case keyBack:
+		return true, requestBack
+	case keySend:
+		return true, m.selectCurrent()
+	default:
+		return false, nil
+	}
+}
+
+func (m *settingsModel) handleDeleteConfirmKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	switch msg.String() {
+	case keyQuit:
+		return true, requestQuit
+	case keyBack:
+		m.mode = settingsModeMenu
+		return true, nil
+	case "left", "right", "tab":
+		m.confirmIndex = (m.confirmIndex + 1) % 2
+		return true, nil
+	case keySend:
+		if m.confirmIndex == 1 {
+			m.mode = settingsModeMenu
+			return true, nil
+		}
+		return true, requestDeleteAccount
+	default:
+		return false, nil
+	}
+}
+
+func (m *settingsModel) selectCurrent() tea.Cmd {
+	item, ok := m.list.SelectedItem().(settingsOptionItem)
+	if !ok {
+		return nil
+	}
+	if item.action != settingsOptionDeleteAccount {
+		return nil
+	}
+	m.mode = settingsModeDeleteConfirm
+	m.confirmIndex = 1 // Default to Cancel for destructive confirmations.
+	return nil
 }
 
 func (m *settingsModel) setDark(isDark bool) {
@@ -104,8 +168,18 @@ func (m settingsModel) render() string {
 		m.renderTitle(layout.content.width),
 		m.renderAccount(layout.content.width),
 		"",
-		m.list.View(),
-		m.styles.hint.Width(layout.content.width).Align(lipgloss.Center).Render(settingsHintLine),
+	}
+	if m.mode == settingsModeDeleteConfirm {
+		sections = append(sections,
+			m.renderDeleteConfirm(layout.content.width),
+			"",
+			m.styles.hint.Width(layout.content.width).Align(lipgloss.Center).Render(settingsConfirmHintLine),
+		)
+	} else {
+		sections = append(sections,
+			m.list.View(),
+			m.styles.hint.Width(layout.content.width).Align(lipgloss.Center).Render(settingsHintLine),
+		)
 	}
 	content := lipgloss.JoinVertical(lipgloss.Left, sections...)
 	content = lipgloss.NewStyle().
@@ -139,6 +213,21 @@ func (m settingsModel) renderAccount(width int) string {
 	return lipgloss.NewStyle().Width(width).Align(lipgloss.Center).Render(line)
 }
 
+func (m settingsModel) renderDeleteConfirm(width int) string {
+	actions := newAuthStyles(m.screen.isDark)
+	prompt := m.styles.hint.Render(wrapCenter("Delete your account permanently?", width))
+	deleteButton := actions.tab.Render("Delete")
+	cancelButton := actions.tab.Render("Cancel")
+	if m.confirmIndex == 0 {
+		deleteButton = actions.activeTab.Render("Delete")
+	} else {
+		cancelButton = actions.activeTab.Render("Cancel")
+	}
+	buttons := lipgloss.JoinHorizontal(lipgloss.Center, deleteButton, "  ", cancelButton)
+	buttons = lipgloss.NewStyle().Width(width).Align(lipgloss.Center).Render(buttons)
+	return lipgloss.JoinVertical(lipgloss.Center, prompt, "", buttons)
+}
+
 func newSettingsList(styles myChatsStyles) list.Model {
 	l := list.New(settingsOptions(), settingsDelegate(styles), 1, 1)
 	l.Title = settingsTitle
@@ -161,8 +250,8 @@ func settingsDelegate(styles myChatsStyles) list.DefaultDelegate {
 
 func settingsOptions() []list.Item {
 	return []list.Item{
-		settingsOptionItem{title: "SSH key settings", description: "Add/remove SSH key"},
-		settingsOptionItem{title: "Delete account", description: "Delete account permanently"},
+		settingsOptionItem{action: settingsOptionSSHKeys, title: "SSH key settings", description: "Add/remove SSH key"},
+		settingsOptionItem{action: settingsOptionDeleteAccount, title: "Delete account", description: "Delete account permanently"},
 	}
 }
 

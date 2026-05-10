@@ -36,6 +36,8 @@ func (m *model) applyFlowIntent(msg tea.Msg) tea.Cmd {
 		return m.joinRoomByCode(msg.JoinCode)
 	case tui.DeleteRoomRequested:
 		return m.deleteRoom(msg.RoomID)
+	case tui.DeleteAccountRequested:
+		return m.deleteAccount()
 	case tui.LeaveRequested:
 		return m.leaveRoomView()
 	default:
@@ -340,6 +342,12 @@ func deleteRoomErrorMessage(err error) string {
 	default:
 		return "Could not delete room."
 	}
+}
+
+func (m *model) deleteAccount() tea.Cmd {
+	// Account deletion needs storage-level ownership semantics (owned rooms,
+	// authored messages, SSH keys) before Session can safely make this destructive.
+	return nil
 }
 
 func (m *model) upsertRoomSummary(summary chat.RoomSummary) {
