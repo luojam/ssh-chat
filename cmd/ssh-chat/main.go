@@ -21,6 +21,7 @@ import (
 	"github.com/luojam/ssh-chat/internal/chat"
 	"github.com/luojam/ssh-chat/internal/session"
 	"github.com/luojam/ssh-chat/internal/storage/sqlite"
+	"github.com/luojam/ssh-chat/internal/tui"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -99,7 +100,7 @@ func teaHandler(sess ssh.Session, chatService session.ChatService, authService a
 
 	publicKey, fingerprint := sshKeyIdentity(sess)
 
-	return session.New(session.Config{
+	app := session.New(session.Config{
 		Width:             pty.Window.Width,
 		Height:            pty.Window.Height,
 		Context:           sess.Context(),
@@ -112,7 +113,8 @@ func teaHandler(sess ssh.Session, chatService session.ChatService, authService a
 		Member: chat.Member{
 			Name: memberName(sess),
 		},
-	}), []tea.ProgramOption{tea.WithContext(sess.Context())}
+	})
+	return tui.WithMinimumSize(app, pty.Window.Width, pty.Window.Height), []tea.ProgramOption{tea.WithContext(sess.Context())}
 }
 
 func sshKeyIdentity(sess ssh.Session) (string, string) {
