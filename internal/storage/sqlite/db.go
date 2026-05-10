@@ -17,6 +17,10 @@ func Open(ctx context.Context, path string) (*sql.DB, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := configure(ctx, db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	if err := Migrate(ctx, db); err != nil {
 		db.Close()
 		return nil, err
@@ -24,9 +28,22 @@ func Open(ctx context.Context, path string) (*sql.DB, error) {
 	return db, nil
 }
 
+func configure(ctx context.Context, db *sql.DB) error {
+	statements := []string{
+		`PRAGMA journal_mode = WAL`,
+		`PRAGMA busy_timeout = 5000`,
+		`PRAGMA foreign_keys = ON`,
+	}
+	for _, statement := range statements {
+		if _, err := db.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("sqlite configure: %w", err)
+		}
+	}
+	return nil
+}
+
 func Migrate(ctx context.Context, db *sql.DB) error {
 	statements := []string{
-		`PRAGMA foreign_keys = ON`,
 		`CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY,
 			username TEXT NOT NULL UNIQUE,
