@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -26,19 +27,54 @@ import (
 )
 
 const (
-	host              = "localhost"
-	port              = "2222"
-	hostKeyPath       = ".ssh/id_ed25519"
-	defaultMember     = "anonymous"
-	defaultSQLitePath = "data/ssh-chat.sqlite"
+	envHost        = "SSH_CHAT_HOST"
+	envPort        = "SSH_CHAT_PORT"
+	envHostKeyPath = "SSH_CHAT_HOST_KEY_PATH"
+	envSQLitePath  = "SSH_CHAT_SQLITE_PATH"
+
+	defaultHost        = "0.0.0.0"
+	defaultPort        = "2222"
+	defaultHostKeyPath = "/var/lib/ssh-chat/ssh_host_ed25519"
+	defaultSQLitePath  = "/var/lib/ssh-chat/ssh-chat.sqlite"
+	defaultMember      = "anonymous"
 )
 
+type serverConfig struct {
+	Host        string
+	Port        string
+	HostKeyPath string
+	SQLitePath  string
+}
+
+func loadConfig() serverConfig {
+	return serverConfig{
+		Host:        envString(envHost, defaultHost),
+		Port:        envString(envPort, defaultPort),
+		HostKeyPath: envString(envHostKeyPath, defaultHostKeyPath),
+		SQLitePath:  envString(envSQLitePath, defaultSQLitePath),
+	}
+}
+
+func envString(name, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
 func main() {
-	if err := os.MkdirAll("data", 0o700); err != nil {
-		log.Error("Could not create data directory", "error", err)
+	config := loadConfig()
+	if err := ensureParentDir(config.SQLitePath); err != nil {
+		log.Error("Could not create SQLite data directory", "path", config.SQLitePath, "error", err)
 		return
 	}
-	db, err := sqlite.Open(context.Background(), defaultSQLitePath)
+	if err := ensureParentDir(config.HostKeyPath); err != nil {
+		log.Error("Could not create SSH host key directory", "path", config.HostKeyPath, "error", err)
+		return
+	}
+
+	db, err := sqlite.Open(context.Background(), config.SQLitePath)
 	if err != nil {
 		log.Error("Could not open SQLite database", "error", err)
 		return
@@ -48,8 +84,8 @@ func main() {
 	chatService := chat.NewService(sqlite.NewChatStore(db))
 
 	s, err := wish.NewServer(
-		wish.WithAddress(net.JoinHostPort(host, port)),
-		wish.WithHostKeyPath(hostKeyPath),
+		wish.WithAddress(net.JoinHostPort(config.Host, config.Port)),
+		wish.WithHostKeyPath(config.HostKeyPath),
 		// Accept any client public key as transport identity. App-level username/password
 		// auth still happens in the TUI; this only makes Wish expose sess.PublicKey()
 		// so the Session can offer explicit key linking after password auth.
@@ -69,11 +105,12 @@ func main() {
 	)
 	if err != nil {
 		log.Error("Could not start server", "error", err)
+		return
 	}
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	log.Info("Starting SSH server", "host", host, "port", port)
+	log.Info("Starting SSH server", "host", config.Host, "port", config.Port, "sqlite", config.SQLitePath, "host_key", config.HostKeyPath)
 	go func() {
 		if err = s.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
 			log.Error("Could not start server", "error", err)
@@ -88,6 +125,14 @@ func main() {
 	if err := s.Shutdown(ctx); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
 		log.Error("Could not stop server", "error", err)
 	}
+}
+
+func ensureParentDir(path string) error {
+	dir := filepath.Dir(path)
+	if dir == "." || dir == "" {
+		return nil
+	}
+	return os.MkdirAll(dir, 0o700)
 }
 
 func teaHandler(sess ssh.Session, chatService session.ChatService, authService auth.Service) (tea.Model, []tea.ProgramOption) {
