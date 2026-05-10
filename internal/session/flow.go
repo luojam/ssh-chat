@@ -26,6 +26,12 @@ func (m *model) applyFlowIntent(msg tea.Msg) tea.Cmd {
 		return m.submitAuth(msg)
 	case tui.LinkSSHKeySelectionRequested:
 		return m.answerSSHKeyLink(msg.Link)
+	case tui.SSHKeySettingsRequested:
+		return m.openSSHKeySettings()
+	case tui.LinkCurrentSSHKeyRequested:
+		return m.linkCurrentSSHKey()
+	case tui.DeleteLinkedSSHKeyRequested:
+		return m.deleteLinkedSSHKey()
 	case tui.MainMenuSelectionRequested:
 		return m.openMainMenuSelection(msg.Action)
 	case tui.RoomSelected:
@@ -69,6 +75,8 @@ func (m *model) backFromCurrentView() tea.Cmd {
 		return m.showStandaloneView(viewMainMenu)
 	case viewSettings:
 		return m.showStandaloneView(viewMainMenu)
+	case viewSSHKeySettings:
+		return m.showStandaloneView(viewSettings)
 	default:
 		return nil
 	}
@@ -147,9 +155,53 @@ func (m *model) answerSSHKeyLink(link bool) tea.Cmd {
 	if link && m.authenticatedUser != nil && m.authService != nil {
 		// Duplicate same-user links are handled as a no-op by the auth service. If
 		// the key was raced onto another user, continue safely without relinking.
-		_ = m.authService.LinkSSHKey(m.ctx, *m.authenticatedUser, m.connectionSSHPublicKey, m.connectionSSHKeyFingerprint)
+		if err := m.authService.LinkSSHKey(m.ctx, *m.authenticatedUser, m.connectionSSHPublicKey, m.connectionSSHKeyFingerprint); err == nil {
+			m.linkedSSHKeyFingerprint = m.connectionSSHKeyFingerprint
+		}
 	}
 	return m.showStandaloneView(viewMainMenu)
+}
+
+func (m *model) openSSHKeySettings() tea.Cmd {
+	if m.view != viewSettings {
+		return nil
+	}
+	m.refreshLinkedSSHKey()
+	return m.showStandaloneView(viewSSHKeySettings)
+}
+
+func (m *model) linkCurrentSSHKey() tea.Cmd {
+	if m.view != viewSSHKeySettings || m.authService == nil || m.authenticatedUser == nil || m.connectionSSHPublicKey == "" || m.connectionSSHKeyFingerprint == "" {
+		return nil
+	}
+	if err := m.authService.LinkSSHKey(m.ctx, *m.authenticatedUser, m.connectionSSHPublicKey, m.connectionSSHKeyFingerprint); err != nil {
+		return nil
+	}
+	m.linkedSSHKeyFingerprint = m.connectionSSHKeyFingerprint
+	return m.showStandaloneView(viewSSHKeySettings)
+}
+
+func (m *model) deleteLinkedSSHKey() tea.Cmd {
+	if m.view != viewSSHKeySettings || m.authService == nil || m.authenticatedUser == nil || m.linkedSSHKeyFingerprint == "" {
+		return nil
+	}
+	if err := m.authService.DeleteSSHKey(m.ctx, *m.authenticatedUser, m.linkedSSHKeyFingerprint); err != nil {
+		return nil
+	}
+	m.linkedSSHKeyFingerprint = ""
+	return m.showStandaloneView(viewSSHKeySettings)
+}
+
+func (m *model) refreshLinkedSSHKey() {
+	m.linkedSSHKeyFingerprint = ""
+	if m.authService == nil || m.authenticatedUser == nil {
+		return
+	}
+	key, err := m.authService.FindLinkedSSHKey(m.ctx, *m.authenticatedUser)
+	if err != nil {
+		return
+	}
+	m.linkedSSHKeyFingerprint = key.Fingerprint
 }
 
 func (m *model) setAuthenticatedUser(user auth.User) {
@@ -448,6 +500,10 @@ func (m model) newUI(view viewState) tea.Model {
 		return tui.NewManageRooms(config)
 	case viewSettings:
 		return tui.NewSettings(config)
+	case viewSSHKeySettings:
+		config.SSHKeyFingerprint = m.connectionSSHKeyFingerprint
+		config.LinkedSSHKeyFingerprint = m.linkedSSHKeyFingerprint
+		return tui.NewSSHKeySettings(config)
 	case viewChat:
 		config.RoomTitle = m.activeRoomTitle
 		config.RoomJoinCode = chat.FormatJoinCode(m.activeRoomJoinCode)

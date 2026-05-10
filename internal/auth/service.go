@@ -16,7 +16,9 @@ type Store interface {
 	CreateUser(ctx context.Context, user StoredUser) (User, error)
 	FindByUsername(ctx context.Context, username string) (StoredUser, error)
 	FindUserBySSHKeyFingerprint(ctx context.Context, fingerprint string) (User, error)
+	FindSSHKeyByUserID(ctx context.Context, userID string) (SSHKey, error)
 	LinkSSHKey(ctx context.Context, key SSHKey) error
+	DeleteSSHKey(ctx context.Context, userID, fingerprint string) error
 	DeleteAccount(ctx context.Context, userID string) error
 }
 
@@ -24,7 +26,9 @@ type Service interface {
 	Signup(ctx context.Context, username, password, confirmPassword string) (User, error)
 	Login(ctx context.Context, username, password string) (User, error)
 	FindUserBySSHKeyFingerprint(ctx context.Context, fingerprint string) (User, error)
+	FindLinkedSSHKey(ctx context.Context, user User) (SSHKey, error)
 	LinkSSHKey(ctx context.Context, user User, publicKey, fingerprint string) error
+	DeleteSSHKey(ctx context.Context, user User, fingerprint string) error
 	DeleteAccount(ctx context.Context, user User) error
 }
 
@@ -99,6 +103,13 @@ func (s *PasswordService) FindUserBySSHKeyFingerprint(ctx context.Context, finge
 	return s.store.FindUserBySSHKeyFingerprint(ctx, fingerprint)
 }
 
+func (s *PasswordService) FindLinkedSSHKey(ctx context.Context, user User) (SSHKey, error) {
+	if strings.TrimSpace(user.ID) == "" {
+		return SSHKey{}, ErrInvalidInput
+	}
+	return s.store.FindSSHKeyByUserID(ctx, user.ID)
+}
+
 func (s *PasswordService) LinkSSHKey(ctx context.Context, user User, publicKey, fingerprint string) error {
 	publicKey = strings.TrimSpace(publicKey)
 	fingerprint = normalizeFingerprint(fingerprint)
@@ -116,6 +127,14 @@ func (s *PasswordService) LinkSSHKey(ctx context.Context, user User, publicKey, 
 		PublicKey:   publicKey,
 		Fingerprint: fingerprint,
 	})
+}
+
+func (s *PasswordService) DeleteSSHKey(ctx context.Context, user User, fingerprint string) error {
+	fingerprint = normalizeFingerprint(fingerprint)
+	if strings.TrimSpace(user.ID) == "" || fingerprint == "" {
+		return ErrInvalidInput
+	}
+	return s.store.DeleteSSHKey(ctx, user.ID, fingerprint)
 }
 
 func (s *PasswordService) DeleteAccount(ctx context.Context, user User) error {

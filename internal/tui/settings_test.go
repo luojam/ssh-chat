@@ -33,12 +33,15 @@ func TestSettingsEscRequestsBack(t *testing.T) {
 	}
 }
 
-func TestSettingsEnterOnSSHKeySettingsDoesNothingForNow(t *testing.T) {
+func TestSettingsEnterOnSSHKeySettingsRequestsSSHKeySettings(t *testing.T) {
 	m := newSettingsModel(t, Config{Width: 70, Height: 16, Username: "alice"})
 
 	_, cmd := m.Update(keySpecial(tea.KeyEnter))
-	if cmd != nil {
-		t.Fatal("enter on ssh key settings should not produce a command yet")
+	if cmd == nil {
+		t.Fatal("enter on ssh key settings should request ssh key settings")
+	}
+	if _, ok := cmd().(SSHKeySettingsRequested); !ok {
+		t.Fatalf("command returned %T, want SSHKeySettingsRequested", cmd())
 	}
 }
 

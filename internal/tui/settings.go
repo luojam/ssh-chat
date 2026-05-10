@@ -136,12 +136,16 @@ func (m *settingsModel) selectCurrent() tea.Cmd {
 	if !ok {
 		return nil
 	}
-	if item.action != settingsOptionDeleteAccount {
+	switch item.action {
+	case settingsOptionSSHKeys:
+		return requestSSHKeySettings()
+	case settingsOptionDeleteAccount:
+		m.mode = settingsModeDeleteConfirm
+		m.confirmIndex = 1 // Default to Cancel for destructive confirmations.
+		return nil
+	default:
 		return nil
 	}
-	m.mode = settingsModeDeleteConfirm
-	m.confirmIndex = 1 // Default to Cancel for destructive confirmations.
-	return nil
 }
 
 func (m *settingsModel) setDark(isDark bool) {

@@ -1235,7 +1235,15 @@ func (successfulAuthService) FindUserBySSHKeyFingerprint(context.Context, string
 	return auth.User{}, auth.ErrSSHKeyNotFound
 }
 
+func (successfulAuthService) FindLinkedSSHKey(context.Context, auth.User) (auth.SSHKey, error) {
+	return auth.SSHKey{}, auth.ErrSSHKeyNotFound
+}
+
 func (successfulAuthService) LinkSSHKey(context.Context, auth.User, string, string) error {
+	return nil
+}
+
+func (successfulAuthService) DeleteSSHKey(context.Context, auth.User, string) error {
 	return nil
 }
 
@@ -1259,7 +1267,15 @@ func (s failingAuthService) FindUserBySSHKeyFingerprint(context.Context, string)
 	return auth.User{}, s.err
 }
 
+func (s failingAuthService) FindLinkedSSHKey(context.Context, auth.User) (auth.SSHKey, error) {
+	return auth.SSHKey{}, s.err
+}
+
 func (s failingAuthService) LinkSSHKey(context.Context, auth.User, string, string) error {
+	return s.err
+}
+
+func (s failingAuthService) DeleteSSHKey(context.Context, auth.User, string) error {
 	return s.err
 }
 
@@ -1286,7 +1302,15 @@ func (s *recordingAuthService) FindUserBySSHKeyFingerprint(context.Context, stri
 	return auth.User{}, auth.ErrSSHKeyNotFound
 }
 
+func (s *recordingAuthService) FindLinkedSSHKey(context.Context, auth.User) (auth.SSHKey, error) {
+	return auth.SSHKey{}, auth.ErrSSHKeyNotFound
+}
+
 func (s *recordingAuthService) LinkSSHKey(context.Context, auth.User, string, string) error {
+	return nil
+}
+
+func (s *recordingAuthService) DeleteSSHKey(context.Context, auth.User, string) error {
 	return nil
 }
 
@@ -1318,16 +1342,39 @@ func (s *keyAuthService) FindUserBySSHKeyFingerprint(_ context.Context, fingerpr
 	return user, nil
 }
 
+func (s *keyAuthService) FindLinkedSSHKey(_ context.Context, user auth.User) (auth.SSHKey, error) {
+	for fingerprint, linked := range s.linked {
+		if linked.ID == user.ID {
+			return auth.SSHKey{UserID: user.ID, Fingerprint: fingerprint}, nil
+		}
+	}
+	return auth.SSHKey{}, auth.ErrSSHKeyNotFound
+}
+
 func (s *keyAuthService) LinkSSHKey(_ context.Context, user auth.User, _, fingerprint string) error {
 	linked, ok := s.linked[fingerprint]
-	if !ok {
-		s.linked[fingerprint] = user
-		return nil
+	if ok {
+		if linked.ID == user.ID {
+			return nil
+		}
+		return auth.ErrSSHKeyAlreadyLinked
 	}
-	if linked.ID == user.ID {
-		return nil
+	for linkedFingerprint, linked := range s.linked {
+		if linked.ID == user.ID {
+			delete(s.linked, linkedFingerprint)
+		}
 	}
-	return auth.ErrSSHKeyAlreadyLinked
+	s.linked[fingerprint] = user
+	return nil
+}
+
+func (s *keyAuthService) DeleteSSHKey(_ context.Context, user auth.User, fingerprint string) error {
+	linked, ok := s.linked[fingerprint]
+	if !ok || linked.ID != user.ID {
+		return auth.ErrSSHKeyNotFound
+	}
+	delete(s.linked, fingerprint)
+	return nil
 }
 
 func (s *keyAuthService) DeleteAccount(_ context.Context, user auth.User) error {

@@ -62,29 +62,73 @@ func (s *UserStore) FindUserBySSHKeyFingerprint(ctx context.Context, fingerprint
 	return user, nil
 }
 
-func (s *UserStore) LinkSSHKey(ctx context.Context, key auth.SSHKey) error {
-	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO ssh_keys (id, user_id, public_key, fingerprint) VALUES (?, ?, ?, ?)`,
-		key.ID, key.UserID, key.PublicKey, key.Fingerprint,
+func (s *UserStore) FindSSHKeyByUserID(ctx context.Context, userID string) (auth.SSHKey, error) {
+	var key auth.SSHKey
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, user_id, public_key, fingerprint
+		FROM ssh_keys
+		WHERE user_id = ?
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1`,
+		userID,
 	)
-	if err == nil {
-		return nil
+	if err := row.Scan(&key.ID, &key.UserID, &key.PublicKey, &key.Fingerprint); errors.Is(err, sql.ErrNoRows) {
+		return auth.SSHKey{}, auth.ErrSSHKeyNotFound
+	} else if err != nil {
+		return auth.SSHKey{}, err
 	}
-	if !isUniqueConstraint(err) {
+	return key, nil
+}
+
+func (s *UserStore) LinkSSHKey(ctx context.Context, key auth.SSHKey) error {
+	var existingUserID string
+	row := s.db.QueryRowContext(ctx, `SELECT user_id FROM ssh_keys WHERE fingerprint = ?`, key.Fingerprint)
+	if err := row.Scan(&existingUserID); err == nil {
+		if existingUserID == key.UserID {
+			return nil
+		}
+		return auth.ErrSSHKeyAlreadyLinked
+	} else if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 
-	var existingUserID string
-	row := s.db.QueryRowContext(ctx, `SELECT user_id FROM ssh_keys WHERE fingerprint = ?`, key.Fingerprint)
-	if scanErr := row.Scan(&existingUserID); errors.Is(scanErr, sql.ErrNoRows) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Each account exposes one linked SSH key in settings. Replacing the old key
+	// avoids a hidden backlog of still-valid passwordless auth keys.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM ssh_keys WHERE user_id = ?`, key.UserID); err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO ssh_keys (id, user_id, public_key, fingerprint) VALUES (?, ?, ?, ?)`,
+		key.ID, key.UserID, key.PublicKey, key.Fingerprint,
+	)
+	if err != nil {
+		if isUniqueConstraint(err) {
+			return auth.ErrSSHKeyAlreadyLinked
+		}
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *UserStore) DeleteSSHKey(ctx context.Context, userID, fingerprint string) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM ssh_keys WHERE user_id = ? AND fingerprint = ?`, userID, fingerprint)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
 		return auth.ErrSSHKeyNotFound
-	} else if scanErr != nil {
-		return scanErr
 	}
-	if existingUserID == key.UserID {
-		return nil
-	}
-	return auth.ErrSSHKeyAlreadyLinked
+	return nil
 }
 
 func (s *UserStore) DeleteAccount(ctx context.Context, userID string) error {

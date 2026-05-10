@@ -230,16 +230,39 @@ func (s *memoryStore) FindUserBySSHKeyFingerprint(_ context.Context, fingerprint
 	return user.User, nil
 }
 
+func (s *memoryStore) FindSSHKeyByUserID(_ context.Context, userID string) (SSHKey, error) {
+	for _, key := range s.keys {
+		if key.UserID == userID {
+			return key, nil
+		}
+	}
+	return SSHKey{}, ErrSSHKeyNotFound
+}
+
 func (s *memoryStore) LinkSSHKey(_ context.Context, key SSHKey) error {
 	existing, ok := s.keys[key.Fingerprint]
-	if !ok {
-		s.keys[key.Fingerprint] = key
-		return nil
+	if ok {
+		if existing.UserID == key.UserID {
+			return nil
+		}
+		return ErrSSHKeyAlreadyLinked
 	}
-	if existing.UserID == key.UserID {
-		return nil
+	for fingerprint, linked := range s.keys {
+		if linked.UserID == key.UserID {
+			delete(s.keys, fingerprint)
+		}
 	}
-	return ErrSSHKeyAlreadyLinked
+	s.keys[key.Fingerprint] = key
+	return nil
+}
+
+func (s *memoryStore) DeleteSSHKey(_ context.Context, userID, fingerprint string) error {
+	key, ok := s.keys[fingerprint]
+	if !ok || key.UserID != userID {
+		return ErrSSHKeyNotFound
+	}
+	delete(s.keys, fingerprint)
+	return nil
 }
 
 func (s *memoryStore) DeleteAccount(_ context.Context, userID string) error {

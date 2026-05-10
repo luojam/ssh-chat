@@ -62,6 +62,15 @@ type LinkSSHKeySelectionRequested struct {
 	Link bool
 }
 
+// SSHKeySettingsRequested asks the session to open the SSH key settings view.
+type SSHKeySettingsRequested struct{}
+
+// LinkCurrentSSHKeyRequested asks the session to link the connection's current SSH key.
+type LinkCurrentSSHKeyRequested struct{}
+
+// DeleteLinkedSSHKeyRequested asks the session to delete the currently linked SSH key.
+type DeleteLinkedSSHKeyRequested struct{}
+
 // CreateRoomRequested asks the session to persist a new Room for the authenticated user.
 type CreateRoomRequested struct {
 	Title string
@@ -157,6 +166,24 @@ func requestDeleteAccount() tea.Msg {
 func requestSSHKeyLinkSelection(link bool) tea.Cmd {
 	return func() tea.Msg {
 		return LinkSSHKeySelectionRequested{Link: link}
+	}
+}
+
+func requestSSHKeySettings() tea.Cmd {
+	return func() tea.Msg {
+		return SSHKeySettingsRequested{}
+	}
+}
+
+func requestLinkCurrentSSHKey() tea.Cmd {
+	return func() tea.Msg {
+		return LinkCurrentSSHKeyRequested{}
+	}
+}
+
+func requestDeleteLinkedSSHKey() tea.Cmd {
+	return func() tea.Msg {
+		return DeleteLinkedSSHKeyRequested{}
 	}
 }
 

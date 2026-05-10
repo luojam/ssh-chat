@@ -19,6 +19,7 @@ const (
 	viewMyChats
 	viewManageRooms
 	viewSettings
+	viewSSHKeySettings
 	viewChat
 )
 
@@ -76,6 +77,7 @@ type model struct {
 	authenticatedUser           *auth.User
 	connectionSSHPublicKey      string
 	connectionSSHKeyFingerprint string
+	linkedSSHKeyFingerprint     string
 	member                      chat.Member // authenticated participant after login/key auth
 	width                       int
 	height                      int
@@ -108,7 +110,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tui.QuitRequested:
 		m.close()
 		return m, tea.Quit
-	case tui.ContinueRequested, tui.BackRequested, tui.AuthSubmissionRequested, tui.LinkSSHKeySelectionRequested, tui.MainMenuSelectionRequested, tui.RoomSelected, tui.CreateRoomRequested, tui.JoinRoomRequested, tui.DeleteRoomRequested, tui.DeleteAccountRequested, tui.LeaveRequested:
+	case tui.ContinueRequested, tui.BackRequested, tui.AuthSubmissionRequested, tui.LinkSSHKeySelectionRequested, tui.SSHKeySettingsRequested, tui.LinkCurrentSSHKeyRequested, tui.DeleteLinkedSSHKeyRequested, tui.MainMenuSelectionRequested, tui.RoomSelected, tui.CreateRoomRequested, tui.JoinRoomRequested, tui.DeleteRoomRequested, tui.DeleteAccountRequested, tui.LeaveRequested:
 		return m, m.applyFlowIntent(msg)
 	case tui.SendRequested:
 		return m, m.postMessage(msg.Body)

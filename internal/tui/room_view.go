@@ -16,14 +16,15 @@ const (
 )
 
 type Config struct {
-	Width             int
-	Height            int
-	Rooms             []RoomListItem
-	OwnedRooms        []RoomListItem
-	RoomTitle         string
-	RoomJoinCode      string
-	SSHKeyFingerprint string
-	Username          string
+	Width                   int
+	Height                  int
+	Rooms                   []RoomListItem
+	OwnedRooms              []RoomListItem
+	RoomTitle               string
+	RoomJoinCode            string
+	SSHKeyFingerprint       string
+	LinkedSSHKeyFingerprint string
+	Username                string
 }
 
 type RoomListItem struct {
