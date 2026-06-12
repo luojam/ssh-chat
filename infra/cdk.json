@@ -1,0 +1,22 @@
+{
+  "app": "npx ts-node --prefer-ts-exts bin/ssh-chat.ts",
+  "watch": {
+    "include": ["**"],
+    "exclude": [
+      "README.md",
+      "cdk*.json",
+      "**/*.d.ts",
+      "**/*.js",
+      "tsconfig.json",
+      "package*.json",
+      "node_modules",
+      "cdk.out"
+    ]
+  },
+  "context": {
+    "appPort": 2222,
+    "allowedAppCidr": "0.0.0.0/0",
+    "instanceType": "t3.micro",
+    "dataVolumeGiB": 10
+  }
+}

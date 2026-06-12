@@ -4,6 +4,11 @@ AGENTS.md
 CONTEXT.md
 docs
 README.md
+assets
+compose.yml
+infra
+infra/node_modules
+plan.md
 
 # Local runtime state/secrets; must come from runtime volume, not image.
 .ssh
@@ -29,3 +34,4 @@ coverage.*
 *.swp
 .codex
 .cursor
+.agents

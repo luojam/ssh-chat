@@ -12,6 +12,8 @@ Built with Go, Wish, Bubble Tea, and SQLite.
 ssh ssh.luja.dev -p 2222
 ```
 
+Deployed on AWS using `AWS CDK`. See `infra/` for setup.
+
 ## ✨ Features
 
 - SSH server entrypoint: connect with an SSH client, no web browser needed.
